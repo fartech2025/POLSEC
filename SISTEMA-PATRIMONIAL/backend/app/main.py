@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
+import logging
 
 from app.config import settings
 from app.database import Base, engine
@@ -9,7 +10,14 @@ from app.middleware.tenant import TenantMiddleware
 from app.routers import auth, patrimonio, movimentacao, dashboard, assistente, da
 from app.routers import tenant
 
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
+
+# Cria tabelas apenas se DATABASE_URL estiver configurado
+if settings.DATABASE_URL:
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.warning("Não foi possível criar tabelas no banco: %s", exc)
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
 

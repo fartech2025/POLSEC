@@ -3,11 +3,15 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.services.auth_service import login_com_supabase, logout_supabase
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+# Em produção (DEBUG=False) os cookies exigem HTTPS
+_SECURE_COOKIE = not settings.DEBUG
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -36,13 +40,17 @@ def login(
         key="access_token",
         value=tokens["access_token"],
         httponly=True,
+        secure=_SECURE_COOKIE,
         samesite="lax",
+        max_age=3600,
     )
     response.set_cookie(
         key="refresh_token",
         value=tokens["refresh_token"],
         httponly=True,
+        secure=_SECURE_COOKIE,
         samesite="lax",
+        max_age=7 * 24 * 3600,
     )
     return response
 

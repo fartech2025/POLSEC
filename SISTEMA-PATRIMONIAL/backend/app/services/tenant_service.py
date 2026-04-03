@@ -43,32 +43,45 @@ def registrar_tenant(
         metadata={"nome": nome_admin, "empresa": nome_empresa, "slug": slug},
     )
 
-    # 3. Cria o Tenant
-    tenant_id = str(uuid.uuid4())
-    tenant = Tenant(
-        id=tenant_id,
-        slug=slug,
-        nome=nome_empresa,
-        email_admin=email_admin,
-        plano=plano,
-        ativo=True,
-    )
-    db.add(tenant)
-    db.flush()
+    # 3. Cria o Tenant e o Usuario admin no banco.
+    # Em caso de falha no DB, remove o usuário do Supabase Auth (compensating tx).
+    try:
+        tenant_id = str(uuid.uuid4())
+        tenant = Tenant(
+            id=tenant_id,
+            slug=slug,
+            nome=nome_empresa,
+            email_admin=email_admin,
+            plano=plano,
+            ativo=True,
+        )
+        db.add(tenant)
+        db.flush()
 
-    # 4. Cria o Usuario admin
-    usuario = Usuario(
-        supabase_uid=supabase_uid,
-        tenant_id=tenant_id,
-        nome=nome_admin,
-        email=email_admin,
-        perfil=PerfilUsuario.administrador,
-        ativo=True,
-    )
-    db.add(usuario)
-    db.commit()
-    db.refresh(tenant)
-    return tenant
+        usuario = Usuario(
+            supabase_uid=supabase_uid,
+            tenant_id=tenant_id,
+            nome=nome_admin,
+            email=email_admin,
+            perfil=PerfilUsuario.administrador,
+            ativo=True,
+        )
+        db.add(usuario)
+        db.commit()
+        db.refresh(tenant)
+        return tenant
+    except Exception as exc:
+        db.rollback()
+        # Rollback compensatório: remove o usuário criado no Supabase Auth
+        try:
+            from app.services.auth_service import get_supabase_admin
+            get_supabase_admin().auth.admin.delete_user(supabase_uid)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Falha ao registrar empresa. Tente novamente.",
+        ) from exc
 
 
 def buscar_tenant_por_slug(db: Session, slug: str) -> Tenant | None:

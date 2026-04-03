@@ -253,8 +253,8 @@ async def chat_stream(
     while True:
         with client.messages.stream(
             model="claude-opus-4-6",
-            max_tokens=4096,
-            thinking={"type": "adaptive"},
+            max_tokens=8000,
+            thinking={"type": "enabled", "budget_tokens": 5000},
             system=SYSTEM_PROMPT,
             tools=FERRAMENTAS,
             messages=historico,

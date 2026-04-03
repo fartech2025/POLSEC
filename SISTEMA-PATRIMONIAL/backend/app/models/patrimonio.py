@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Enum, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, Enum, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -14,6 +14,10 @@ class StatusPatrimonio(str, enum.Enum):
 
 class Patrimonio(Base):
     __tablename__ = "patrimonios"
+    __table_args__ = (
+        # Código único por tenant — evita duplicatas entre empresas diferentes
+        UniqueConstraint("tenant_id", "codigo", name="uq_patrimonio_tenant_codigo"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(36), ForeignKey("tenants.id"), nullable=False, index=True)

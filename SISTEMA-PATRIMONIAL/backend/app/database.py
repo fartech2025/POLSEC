@@ -38,5 +38,8 @@ def get_db_with_tenant(tenant_id: str):
             {"tid": tenant_id},
         )
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

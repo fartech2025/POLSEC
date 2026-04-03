@@ -48,8 +48,14 @@ def login_com_supabase(email: str, senha: str) -> dict:
 
 
 def logout_supabase(access_token: str) -> None:
+    """Revoga a sessão no Supabase usando o token do usuário."""
     sb = get_supabase()
-    sb.auth.sign_out()
+    # Seta o token no client antes de revogar para invalidar a sessão correta
+    try:
+        sb.auth.admin.sign_out(access_token)
+    except Exception:
+        # Se a revogação falhar (token expirado, etc.) continua o logout local
+        pass
 
 
 def registrar_usuario_supabase(email: str, senha: str, metadata: dict = None) -> str:
@@ -120,18 +126,23 @@ def get_usuario_logado(
     # Tenant corrente (resolvido pelo middleware)
     tenant_slug = getattr(request.state, "tenant_slug", None)
 
-    query = db.query(Usuario).filter(
+    # Tenant é OBRIGATÓRIO para isolamento multitenant.
+    # Sem slug não há como garantir que o usuário pertence ao tenant correto.
+    tenant_slug = getattr(request.state, "tenant_slug", None)
+    if not tenant_slug:
+        raise _redirecionar
+
+    tenant = db.query(Tenant).filter(
+        Tenant.slug == tenant_slug, Tenant.ativo == True
+    ).first()
+    if not tenant:
+        raise _redirecionar
+
+    usuario = db.query(Usuario).filter(
         Usuario.supabase_uid == supabase_uid,
+        Usuario.tenant_id == tenant.id,
         Usuario.ativo == True,
-    )
-
-    # Filtra pelo tenant se identificado
-    if tenant_slug:
-        tenant = db.query(Tenant).filter(Tenant.slug == tenant_slug).first()
-        if tenant:
-            query = query.filter(Usuario.tenant_id == tenant.id)
-
-    usuario = query.first()
+    ).first()
     if not usuario:
         raise _redirecionar
 
