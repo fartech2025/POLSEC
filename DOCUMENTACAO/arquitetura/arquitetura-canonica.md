@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.0  
+> **Versão:** 3.1  
 > **Data:** 03/04/2026  
-> **Commit HEAD:** `beca4ab`  
+> **Commit HEAD:** `4f03a7e`  
 > **Branch:** `main`
 
 ---
@@ -51,6 +51,7 @@ backend/
 ├── run.py                        # Entry point: uvicorn com reload
 ├── seed_sla.py                   # Migração + seed dos SLAs padrão
 ├── criar_usuarios_teste.py       # Script de seed de usuários de teste
+├── importar_patrimonio.py        # Importação da planilha FOR IE02 para o banco
 ├── requirements.txt
 ├── migrations/
 │   └── 001_sla_configs.sql       # DDL da tabela sla_configs
@@ -340,12 +341,158 @@ DEBUG=false
 
 **Patrimônios de teste:** TI-001 a TI-003 (equipamentos TI), EL-001 … EL-002 (elétrico), MO-001 (mobiliário)
 
+**Patrimônios importados (planilha FOR IE02):** 8.002 registros com código PAT-00001 a PAT-08004 e série SPAT-XXXXX.
+
 ---
 
-## 12. Histórico de Commits Relevantes
+## 12. Script de Importação — `importar_patrimonio.py`
+
+### O que faz
+
+Lê a planilha `FOR IE02 - CONTROLE PATRIMONIAL - V1.numbers` e insere os registros na
+tabela `patrimonios` do banco. É **idempotente**: execuções repetidas ignoram registros
+cujo código já exista no tenant, sem sobrescrever dados.
+
+Campos não preenchidos na planilha são gravados como `None` (numérico `0` para valor); os
+usuários completam o cadastro pela interface web nas próximas atualizações.
+
+### Mapeamento de colunas
+
+| Coluna na planilha | Campo no banco | Observação |
+|---|---|---|
+| PAT. (0) | `codigo` | Numérico → `PAT-00001`; texto → `SPAT-00001`; vazio → `IMP-00001` |
+| EQUIPAMENTO (1) | `descricao` | Máx. 255 caracteres |
+| UNIDADE (3) | `setor` | Máx. 100 caracteres |
+| LOCAL (4) | `localizacao` | Máx. 150 caracteres |
+| VALOR (8) | `valor` | Se zero, tenta VALOR UNITÁRIO (col 6) |
+| VALOR UNITÁRIO (6) | `valor` (fallback) | Usado quando col 8 está vazia |
+| OBSERVAÇÕES (7) + N° SÉRIE (2) + NF (5) | `observacoes` | Concatenados com ` \| ` |
+| — | `categoria` | Auto-detectada por palavras-chave na descrição |
+| — | `data_aquisicao` | `None` — usuário preenche depois |
+| — | `status` | Sempre `ativo` na importação |
+
+### Categorização automática
+
+O script detecta a categoria pelo nome do equipamento:
+
+| Palavras-chave | Categoria atribuída |
+|---|---|
+| notebook, switch, servidor, rack, onu, olt, sfp, wifi… | TI / Telecomunicações |
+| celular, smartphone, tablet, rádio… | Telecom / Mobile |
+| antena, torre, fibra, cabo, conector… | Infraestrutura de Rede |
+| câmera, dvr, nvr, cftv… | Segurança / CFTV |
+| ar condicionado, climatizador… | Climatização |
+| gerador, bateria… | Energia |
+| mesa, cadeira, armário… | Mobiliário |
+| (nenhuma) | Não categorizado |
+
+### Pré-requisitos
+
+```bash
+# 1. Ativar ambiente virtual
+source .venv/bin/activate
+
+# 2. Instalar dependência extra (só na primeira vez)
+pip install numbers-parser
+```
+
+### Como usar
+
+**1. Simulação (dry-run) — NÃO grava nada no banco:**
+
+```bash
+python importar_patrimonio.py --dry-run
+```
+
+Exibe o relatório completo (quantos seriam inseridos, ignorados, erros) sem tocar no banco.
+Sempre execute este passo antes de importar de verdade.
+
+---
+
+**2. Importação real com valores padrão** (tenant POLSEC + caminho padrão do arquivo):
+
+```bash
+python importar_patrimonio.py
+```
+
+---
+
+**3. Importação especificando tenant e/ou arquivo:**
+
+```bash
+python importar_patrimonio.py \
+  --tenant-id dd3ce17e-b506-46cf-9cce-707b20d1e253 \
+  --arquivo "/Volumes/FDIAS 320 GB/FOR IE02 - CONTROLE PATRIMONIAL - V1.numbers"
+```
+
+---
+
+**4. Importação para outro tenant** (ex.: novo cliente):
+
+```bash
+python importar_patrimonio.py \
+  --tenant-id <UUID-DO-NOVO-TENANT> \
+  --arquivo "/caminho/para/planilha-do-cliente.numbers"
+```
+
+---
+
+**5. Salvar log em arquivo** (útil para importações grandes):
+
+```bash
+python -u importar_patrimonio.py > /tmp/import_log.txt 2>&1
+cat /tmp/import_log.txt
+```
+
+### Saída esperada
+
+```
+Importando: FOR IE02 - CONTROLE PATRIMONIAL - V1.numbers
+Tenant ID : dd3ce17e-b506-46cf-9cce-707b20d1e253
+------------------------------------------------------------
+  → 500 registros inseridos até agora...
+  → 1000 registros inseridos até agora...
+  ...
+============================================================
+Linhas na planilha  : 8296
+Inseridos           : 8002
+Ignorados (vazios)  : 292
+Ignorados (duplic.) : 2
+Erros               : 0
+============================================================
+Importação concluída.
+```
+
+> **Nota:** Commits em lotes de 500 registros evitam transações excessivamente longas.
+
+### Comportamento em re-execuções
+
+| Situação | Comportamento |
+|---|---|
+| Registro com código já existente no tenant | Ignorado (`Ignorados (duplic.)` +1) |
+| Linha completamente vazia | Ignorado (`Ignorados (vazios)` +1) |
+| Erro em um registro específico | Registrado no terminal; os demais continuam |
+| Execução repetida após importação completa | `Inseridos: 0` — sem duplicatas |
+
+### Campos que o usuário deve completar pelo sistema
+
+Após a importação os campos abaixo ficam em branco e devem ser preenchidos pela equipe:
+
+- **Data de aquisição** — `data_aquisicao` (None)
+- **Responsável** — `responsavel_id` (None)
+- **Valor**, quando não constava na planilha — `valor` (None)
+- **Categoria** — pode ser corrigida manualmente se a auto-detecção errou
+- **Status** — ajuste para `manutencao`, `baixado` ou `extraviado` conforme necessário
+
+Acesse: **Sistema → Patrimônios → [Bem] → Editar**
+
+---
+
+## 13. Histórico de Commits Relevantes
 
 | Commit | Descrição |
 |---|---|
+| `4f03a7e` | Script importar_patrimonio.py — 8.002 patrimônios POLSEC importados |
 | `beca4ab` | auth.py persistido + seed de usuários de teste |
 | `16f4c4b` | Sistema de SLA por prioridade com badges e config admin |
 | `9f262e9` | Fix link Novo Chamado + 6 patrimônios de teste POLSEC |
