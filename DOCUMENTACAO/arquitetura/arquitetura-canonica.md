@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.1  
+> **Versão:** 3.2  
 > **Data:** 03/04/2026  
-> **Commit HEAD:** `4f03a7e`  
+> **Commit HEAD:** `4e8173f`  
 > **Branch:** `main`
 
 ---
@@ -240,6 +240,8 @@ Dependência FastAPI injetada nos routers
 | `base.html` | POLSEC azul (`#003366`) | Administrador |
 | `base_tecnico.html` | POLSEC azul claro | Técnico (operador) |
 
+> **Logo:** ambos `base.html` e `base_tecnico.html` exibem a logo POLSEC via URL pública do Supabase Storage (`POLSEC_MARCA_Artboard 1 copy 16.png`) no topo do sidebar, substituindo o texto anterior.
+
 ### Fluxo de Redirecionamento por Perfil
 
 ```
@@ -342,6 +344,8 @@ DEBUG=false
 **Patrimônios de teste:** TI-001 a TI-003 (equipamentos TI), EL-001 … EL-002 (elétrico), MO-001 (mobiliário)
 
 **Patrimônios importados (planilha FOR IE02):** 8.002 registros com código PAT-00001 a PAT-08004 e série SPAT-XXXXX.
+
+**Total no banco:** 8.008 registros (8.002 importados + 6 de teste).
 
 ---
 
@@ -488,10 +492,43 @@ Acesse: **Sistema → Patrimônios → [Bem] → Editar**
 
 ---
 
-## 13. Histórico de Commits Relevantes
+## 13. Lista de Patrimônios — Paginação e Filtros
+
+Com 8.008 registros no banco, a lista de patrimônios usa paginação server-side para evitar carregar todos os registros de uma vez (commit `57d7b08`).
+
+### Comportamento
+
+| Parâmetro de query | Descrição | Padrão |
+|---|---|---|
+| `page` | Número da página atual | `1` |
+| `busca` | Busca em `codigo`, `descricao` e `localizacao` | — |
+| `categoria` | Filtro por categoria auto-detectada | — |
+| `setor` | Filtro por setor | — |
+| `status_filtro` | Filtro por status (`ativo`, `manutencao`, etc.) | — |
+
+- **50 registros por página** (configurável via `PatrimonioService.PER_PAGE`)
+- `PatrimonioService.listar()` retorna `(itens, total, total_pages)` usando `LIMIT/OFFSET`
+- `listar_categorias()` — retorna categorias distintas para o select de filtro
+- `contar_por_status()` — agrega contagem por status para os KPI cards
+
+### KPI cards na listagem
+
+| Card | Consulta |
+|---|---|
+| Total (filtrado) | `total` retornado pelo `listar()` com filtros aplicados |
+| Ativos | `contar_por_status()['ativo']` (sempre do tenant completo) |
+| Manutenção | `contar_por_status()['manutencao']` |
+| Baixados + Extraviados | soma de `baixado` + `extraviado` |
+
+---
+
+## 14. Histórico de Commits Relevantes
 
 | Commit | Descrição |
 |---|---|
+| `4e8173f` | Logo POLSEC no sidebar (base.html e base_tecnico.html) |
+| `57d7b08` | Paginação + filtro categoria + KPIs na lista de patrimônios (8k+ registros) |
+| `9c57c2d` | Arquitetura canônica v3.1 — documentação da importação FOR IE02 |
 | `4f03a7e` | Script importar_patrimonio.py — 8.002 patrimônios POLSEC importados |
 | `beca4ab` | auth.py persistido + seed de usuários de teste |
 | `16f4c4b` | Sistema de SLA por prioridade com badges e config admin |
