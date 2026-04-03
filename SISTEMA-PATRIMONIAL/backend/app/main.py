@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.middleware.tenant import TenantMiddleware
 from app.routers import auth, patrimonio, movimentacao, dashboard, assistente, da
-from app.routers import tenant, superadmin
+from app.routers import tenant, superadmin, tecnico
 from app.routers import cargo, filial, funcionario, chamado, peca, orcamento
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ app.include_router(assistente.router, prefix="/assistente", tags=["Assistente IA
 app.include_router(da.router, prefix="/da", tags=["Data Analytics"])
 
 app.include_router(superadmin.router, prefix="/superadmin", tags=["SuperAdmin"])
+app.include_router(tecnico.router, prefix="/tecnico", tags=["Técnico"])
 
 # ── Módulos FARTECH ───────────────────────────────────────────────────────────
 app.include_router(cargo.router, prefix="/cargos", tags=["Cargos"])

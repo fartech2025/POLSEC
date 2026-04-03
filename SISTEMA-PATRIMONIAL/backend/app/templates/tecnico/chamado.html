@@ -1,0 +1,233 @@
+{% extends "base_tecnico.html" %}
+{% block title %}Chamado #{{ chamado.id }}{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho -->
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="/tecnico" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h5 class="mb-0 fw-bold">
+      <span class="text-muted fw-normal">#{{ chamado.id }} —</span>
+      {{ chamado.titulo }}
+    </h5>
+    <div class="d-flex gap-2 mt-1">
+      <span class="badge badge-{{ chamado.status.value }} px-2 py-1" style="font-size:.75rem;">
+        {% if chamado.status.value == 'aberto' %}Aberto
+        {% elif chamado.status.value == 'em_atendimento' %}Em Atendimento
+        {% elif chamado.status.value == 'aguardando_peca' %}Ag. Peça
+        {% elif chamado.status.value == 'aguardando_aprovacao' %}Ag. Aprovação
+        {% elif chamado.status.value == 'concluido' %}Concluído
+        {% elif chamado.status.value == 'cancelado' %}Cancelado
+        {% else %}{{ chamado.status.value }}{% endif %}
+      </span>
+      <span class="badge badge-{{ chamado.prioridade.value }} px-2 py-1" style="font-size:.75rem;">
+        {{ chamado.prioridade.value | capitalize }}
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Coluna esquerda: informações do chamado -->
+  <div class="col-lg-5">
+
+    <!-- Dados do chamado -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-info-circle me-2" style="color:#0078d7;"></i>Detalhes do Chamado
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Abertura</dt>
+          <dd class="col-7">{{ chamado.data_abertura.strftime('%d/%m/%Y %H:%M') if chamado.data_abertura else '—' }}</dd>
+
+          {% if chamado.data_previsao %}
+          <dt class="col-5 text-muted">Previsão</dt>
+          <dd class="col-7">{{ chamado.data_previsao.strftime('%d/%m/%Y') }}</dd>
+          {% endif %}
+
+          {% if chamado.data_inicio_atendimento %}
+          <dt class="col-5 text-muted">Início atend.</dt>
+          <dd class="col-7">{{ chamado.data_inicio_atendimento.strftime('%d/%m/%Y %H:%M') }}</dd>
+          {% endif %}
+
+          {% if chamado.data_conclusao %}
+          <dt class="col-5 text-muted">Conclusão</dt>
+          <dd class="col-7">{{ chamado.data_conclusao.strftime('%d/%m/%Y %H:%M') }}</dd>
+          {% endif %}
+
+          <dt class="col-5 text-muted">Solicitante</dt>
+          <dd class="col-7">{{ chamado.solicitante.nome if chamado.solicitante else '—' }}</dd>
+
+          <dt class="col-5 text-muted">Técnico</dt>
+          <dd class="col-7">{{ chamado.tecnico.nome if chamado.tecnico else '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Descrição -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-chat-left-text me-2 text-secondary"></i>Descrição
+      </div>
+      <div class="card-body small">
+        <p class="mb-0" style="white-space:pre-wrap;">{{ chamado.descricao }}</p>
+      </div>
+    </div>
+
+    <!-- Patrimônio -->
+    {% if chamado.patrimonio %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-box-seam me-2" style="color:#ff4e17;"></i>Patrimônio
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Código</dt>
+          <dd class="col-7"><code>{{ chamado.patrimonio.codigo }}</code></dd>
+
+          <dt class="col-5 text-muted">Descrição</dt>
+          <dd class="col-7">{{ chamado.patrimonio.descricao }}</dd>
+
+          <dt class="col-5 text-muted">Categoria</dt>
+          <dd class="col-7">{{ chamado.patrimonio.categoria or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Setor</dt>
+          <dd class="col-7">{{ chamado.patrimonio.setor or '—' }}</dd>
+
+          <dt class="col-5 text-muted">Localização</dt>
+          <dd class="col-7">{{ chamado.patrimonio.localizacao or '—' }}</dd>
+        </dl>
+        <div class="mt-2">
+          <a href="/patrimonio/{{ chamado.patrimonio.id }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Ver bem
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Coluna direita: atualizações técnicas -->
+  <div class="col-lg-7">
+
+    <!-- Diagnóstico e solução já registrados -->
+    {% if chamado.diagnostico or chamado.solucao_aplicada %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-file-earmark-medical me-2 text-success"></i>Registro Técnico
+      </div>
+      <div class="card-body small">
+        {% if chamado.diagnostico %}
+          <p class="fw-semibold mb-1">Diagnóstico:</p>
+          <p class="text-muted mb-3" style="white-space:pre-wrap;">{{ chamado.diagnostico }}</p>
+        {% endif %}
+        {% if chamado.solucao_aplicada %}
+          <p class="fw-semibold mb-1">Solução Aplicada:</p>
+          <p class="text-muted mb-0" style="white-space:pre-wrap;">{{ chamado.solucao_aplicada }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Form de atualização -->
+    {% if chamado.status.value not in ['concluido', 'cancelado', 'rejeitado'] %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-pencil-square me-2" style="color:#0078d7;"></i>Atualizar Chamado
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/tecnico/chamado/{{ chamado.id }}/atualizar">
+
+          <!-- Diagnóstico -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              Diagnóstico
+              <span class="text-muted fw-normal">(opcional)</span>
+            </label>
+            <textarea name="diagnostico" rows="3" class="form-control form-control-sm"
+                      placeholder="Descreva o problema identificado...">{{ chamado.diagnostico or '' }}</textarea>
+          </div>
+
+          <!-- Solução -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">
+              Solução Aplicada
+              <span class="text-muted fw-normal">(opcional)</span>
+            </label>
+            <textarea name="solucao_aplicada" rows="3" class="form-control form-control-sm"
+                      placeholder="Descreva a solução aplicada...">{{ chamado.solucao_aplicada or '' }}</textarea>
+          </div>
+
+          <!-- Transição de status -->
+          <div class="mb-4">
+            <label class="form-label small fw-semibold">Novo Status</label>
+            <div class="d-flex flex-wrap gap-2">
+              {% if chamado.status.value == 'aberto' %}
+                <button type="submit" name="novo_status" value="em_atendimento"
+                        class="btn btn-sm" style="background:#6f42c1;color:#fff;">
+                  <i class="bi bi-play-circle me-1"></i>Iniciar Atendimento
+                </button>
+                <button type="submit" name="novo_status" value="cancelado"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Cancelar este chamado?')">
+                  <i class="bi bi-x-circle me-1"></i>Cancelar
+                </button>
+              {% elif chamado.status.value == 'em_atendimento' %}
+                <button type="submit" name="novo_status" value="aguardando_peca"
+                        class="btn btn-sm btn-warning text-dark">
+                  <i class="bi bi-hourglass-split me-1"></i>Aguardando Peça
+                </button>
+                <button type="submit" name="novo_status" value="aguardando_aprovacao"
+                        class="btn btn-sm" style="background:#ffc107;color:#000;">
+                  <i class="bi bi-clipboard-check me-1"></i>Solicitar Aprovação
+                </button>
+                <button type="submit" name="novo_status" value="concluido"
+                        class="btn btn-sm btn-success">
+                  <i class="bi bi-check-circle me-1"></i>Concluir
+                </button>
+              {% elif chamado.status.value == 'aguardando_peca' %}
+                <button type="submit" name="novo_status" value="em_atendimento"
+                        class="btn btn-sm" style="background:#6f42c1;color:#fff;">
+                  <i class="bi bi-arrow-repeat me-1"></i>Retomar Atendimento
+                </button>
+              {% elif chamado.status.value == 'aguardando_aprovacao' %}
+                <button type="submit" name="novo_status" value="em_atendimento"
+                        class="btn btn-sm" style="background:#6f42c1;color:#fff;">
+                  <i class="bi bi-arrow-repeat me-1"></i>Retomar
+                </button>
+                <button type="submit" name="novo_status" value="concluido"
+                        class="btn btn-sm btn-success">
+                  <i class="bi bi-check-circle me-1"></i>Concluir
+                </button>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Botão de salvar sem mudar status -->
+          <div class="border-top pt-3">
+            <button type="submit" name="novo_status" value="{{ chamado.status.value }}"
+                    class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-floppy me-1"></i>Salvar Diagnóstico/Solução
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert border-0 shadow-sm" style="background:#f0fdf4;color:#166534;">
+      <i class="bi bi-check-circle-fill me-2"></i>
+      Chamado encerrado com status <strong>{{ chamado.status.value }}</strong>.
+      {% if chamado.data_conclusao %}
+        Concluído em {{ chamado.data_conclusao.strftime('%d/%m/%Y às %H:%M') }}.
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

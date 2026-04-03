@@ -23,6 +23,8 @@ def dashboard(
 ):
     if usuario.perfil == PerfilUsuario.superadmin:
         return RedirectResponse(url="/superadmin", status_code=302)
+    if usuario.perfil == PerfilUsuario.operador:
+        return RedirectResponse(url="/tecnico", status_code=302)
     total = (
         db.query(func.count(Patrimonio.id))
         .filter(Patrimonio.tenant_id == tenant.id)
