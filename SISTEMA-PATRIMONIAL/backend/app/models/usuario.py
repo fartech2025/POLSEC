@@ -6,7 +6,8 @@ from app.database import Base
 
 
 class PerfilUsuario(str, enum.Enum):
-    administrador = "administrador"
+    superadmin = "superadmin"    # FARTECH — manutenção e monitoramento da plataforma
+    administrador = "administrador"  # Admin da empresa (tenant) — gestão completa
     operador = "operador"
     visualizador = "visualizador"
 
