@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastrar Empresa — POLSEC</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link href="/static/css/style.css" rel="stylesheet"/>
+</head>
+<body class="bg-dark d-flex align-items-center justify-content-center min-vh-100 py-5">
+  <div class="card shadow-lg" style="width: 480px;">
+    <div class="card-body p-5">
+      <div class="text-center mb-4">
+        <span class="fs-2 fw-bold text-warning">POLSEC</span><br/>
+        <small class="text-muted">Cadastro de nova empresa</small>
+      </div>
+
+      {% if erro %}
+        <div class="alert alert-danger py-2">
+          <i class="bi bi-exclamation-triangle me-1"></i> {{ erro }}
+        </div>
+      {% endif %}
+
+      <form method="POST" action="/empresa/registrar">
+        <h6 class="text-uppercase text-muted fw-bold mb-3 small">Dados da empresa</h6>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nome da empresa</label>
+          <input type="text" name="nome_empresa" class="form-control"
+                 placeholder="Ex: Segurança Express Ltda"
+                 value="{{ form.nome_empresa if form else '' }}" required/>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Identificador único <small class="text-muted">(slug da URL)</small>
+          </label>
+          <div class="input-group">
+            <span class="input-group-text text-muted small">polsec.app/</span>
+            <input type="text" name="slug" class="form-control"
+                   placeholder="minha-empresa"
+                   pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]"
+                   value="{{ form.slug if form else '' }}"
+                   oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9\-]/g,'')"
+                   required/>
+          </div>
+          <div class="form-text">Apenas letras minúsculas, números e hífens.</div>
+        </div>
+
+        <hr class="my-3"/>
+        <h6 class="text-uppercase text-muted fw-bold mb-3 small">Administrador</h6>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nome completo</label>
+          <input type="text" name="nome_admin" class="form-control"
+                 placeholder="João da Silva"
+                 value="{{ form.nome_admin if form else '' }}" required/>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">E-mail</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+            <input type="email" name="email_admin" class="form-control"
+                   placeholder="admin@empresa.com"
+                   value="{{ form.email_admin if form else '' }}" required/>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Senha</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <input type="password" name="senha_admin" class="form-control"
+                   placeholder="Mínimo 8 caracteres" minlength="8" required/>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-warning w-100 fw-bold">
+          <i class="bi bi-building-add me-1"></i> Criar empresa
+        </button>
+      </form>
+
+      <div class="text-center mt-3">
+        <a href="/auth/login" class="text-muted small">
+          <i class="bi bi-arrow-left me-1"></i> Voltar ao login
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

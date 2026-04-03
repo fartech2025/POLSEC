@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ item.codigo }} — Detalhe{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="/patrimonio" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-box-seam me-2 text-primary"></i>{{ item.descricao }}
+  </h4>
+  <a href="/patrimonio/{{ item.id }}/editar" class="btn btn-sm btn-outline-primary ms-auto">
+    <i class="bi bi-pencil me-1"></i> Editar
+  </a>
+</div>
+
+<div class="row g-4">
+  <!-- Dados do bem -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold">
+        <i class="bi bi-info-circle me-2 text-primary"></i>Informações
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted small">Código</dt>
+          <dd class="col-7"><code>{{ item.codigo }}</code></dd>
+
+          <dt class="col-5 text-muted small">Categoria</dt>
+          <dd class="col-7">{{ item.categoria }}</dd>
+
+          <dt class="col-5 text-muted small">Setor</dt>
+          <dd class="col-7">{{ item.setor }}</dd>
+
+          <dt class="col-5 text-muted small">Localização</dt>
+          <dd class="col-7">{{ item.localizacao or '—' }}</dd>
+
+          <dt class="col-5 text-muted small">Responsável</dt>
+          <dd class="col-7">{{ item.responsavel.nome if item.responsavel else '—' }}</dd>
+
+          <dt class="col-5 text-muted small">Valor</dt>
+          <dd class="col-7">
+            {% if item.valor %}R$ {{ "%.2f" | format(item.valor | float) }}{% else %}—{% endif %}
+          </dd>
+
+          <dt class="col-5 text-muted small">Status</dt>
+          <dd class="col-7">
+            {% if item.status.value == 'ativo' %}
+              <span class="badge bg-success">Ativo</span>
+            {% elif item.status.value == 'manutencao' %}
+              <span class="badge bg-warning text-dark">Manutenção</span>
+            {% elif item.status.value == 'baixado' %}
+              <span class="badge bg-secondary">Baixado</span>
+            {% elif item.status.value == 'extraviado' %}
+              <span class="badge bg-danger">Extraviado</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-5 text-muted small">Cadastrado em</dt>
+          <dd class="col-7">{{ item.created_at.strftime('%d/%m/%Y') }}</dd>
+
+          {% if item.observacoes %}
+          <dt class="col-5 text-muted small">Observações</dt>
+          <dd class="col-7">{{ item.observacoes }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Histórico de movimentações -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold">
+        <i class="bi bi-clock-history me-2 text-primary"></i>Histórico de Movimentações
+      </div>
+      <div class="card-body p-0">
+        {% if historico %}
+          <ul class="list-group list-group-flush">
+            {% for mov in historico %}
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between">
+                <span class="fw-semibold small">
+                  {% if mov.tipo.value == 'transferencia_setor' %}
+                    <i class="bi bi-arrows-move text-primary me-1"></i> Transferência de Setor
+                  {% elif mov.tipo.value == 'troca_responsavel' %}
+                    <i class="bi bi-person-arrows text-warning me-1"></i> Troca de Responsável
+                  {% elif mov.tipo.value == 'mudanca_status' %}
+                    <i class="bi bi-toggle2-on text-success me-1"></i> Mudança de Status
+                  {% else %}
+                    <i class="bi bi-pencil text-secondary me-1"></i> Edição de Dados
+                  {% endif %}
+                </span>
+                <small class="text-muted">{{ mov.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+              </div>
+              <small class="text-muted">Por: {{ mov.usuario.nome if mov.usuario else '—' }}</small>
+              {% if mov.descricao %}
+                <div class="mt-1 small">{{ mov.descricao }}</div>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted text-center py-4 mb-0">
+            <i class="bi bi-clock-history fs-4 d-block mb-2"></i> Nenhuma movimentação registrada.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

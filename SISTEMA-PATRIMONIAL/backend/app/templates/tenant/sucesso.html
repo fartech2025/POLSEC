@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Empresa criada — POLSEC</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+</head>
+<body class="bg-dark d-flex align-items-center justify-content-center min-vh-100">
+  <div class="card shadow-lg text-center" style="width: 460px;">
+    <div class="card-body p-5">
+      <div class="mb-4">
+        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+      </div>
+      <h4 class="fw-bold text-white mb-1">Empresa cadastrada!</h4>
+      <p class="text-muted mb-4">
+        <strong class="text-warning">{{ tenant.nome }}</strong> foi criada com sucesso no POLSEC.
+      </p>
+
+      <div class="alert alert-secondary text-start mb-4">
+        <div class="mb-2">
+          <span class="text-muted small">Identificador:</span><br/>
+          <code class="text-warning">{{ tenant.slug }}</code>
+        </div>
+        <div>
+          <span class="text-muted small">Plano:</span><br/>
+          <span class="badge bg-info text-uppercase">{{ tenant.plano }}</span>
+        </div>
+      </div>
+
+      <p class="text-muted small mb-4">
+        Faça login com o e-mail e senha cadastrados.<br/>
+        O sistema identificará automaticamente sua empresa pelo subdomínio
+        ou pelo cabeçalho <code>X-Tenant-Slug</code>.
+      </p>
+
+      <a href="/auth/login" class="btn btn-warning fw-bold w-100">
+        <i class="bi bi-box-arrow-in-right me-1"></i> Ir para o Login
+      </a>
+    </div>
+  </div>
+</body>
+</html>

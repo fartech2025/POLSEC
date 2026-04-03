@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ "Editar" if item else "Novo" }} Patrimônio{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="/patrimonio" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-box-seam me-2 text-primary"></i>
+    {{ "Editar Patrimônio" if item else "Novo Patrimônio" }}
+  </h4>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width: 760px;">
+  <div class="card-body p-4">
+    <form method="POST" action="{{ '/patrimonio/' + item.id | string + '/editar' if item else '/patrimonio/novo' }}">
+
+      <div class="row g-3">
+        {% if not item %}
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Código <span class="text-danger">*</span></label>
+          <input type="text" name="codigo" class="form-control" required placeholder="PAT-001"/>
+        </div>
+        {% endif %}
+
+        <div class="col-md-{% if item %}12{% else %}8{% endif %}">
+          <label class="form-label fw-semibold">Descrição <span class="text-danger">*</span></label>
+          <input type="text" name="descricao" class="form-control" required
+                 value="{{ item.descricao if item else '' }}" placeholder="Ex: Notebook Dell Latitude"/>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Categoria <span class="text-danger">*</span></label>
+          <input type="text" name="categoria" class="form-control" required
+                 value="{{ item.categoria if item else '' }}" placeholder="Ex: Informática"/>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Setor <span class="text-danger">*</span></label>
+          <input type="text" name="setor" class="form-control" required
+                 value="{{ item.setor if item else '' }}" placeholder="Ex: Administrativo"/>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Localização</label>
+          <input type="text" name="localizacao" class="form-control"
+                 value="{{ item.localizacao if item else '' }}" placeholder="Ex: Sala 03 - 2º andar"/>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Responsável</label>
+          <select name="responsavel_id" class="form-select">
+            <option value="">Sem responsável</option>
+            {% for r in responsaveis %}
+              <option value="{{ r.id }}"
+                {% if item and item.responsavel_id == r.id %}selected{% endif %}>
+                {{ r.nome }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Valor (R$)</label>
+          <input type="text" name="valor" class="form-control"
+                 value="{{ item.valor if item else '' }}" placeholder="0,00"/>
+        </div>
+
+        {% if item %}
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Status</label>
+          <select name="status" class="form-select">
+            {% for s in status_opcoes %}
+              <option value="{{ s.value }}" {% if item.status == s %}selected{% endif %}>
+                {{ s.value | capitalize }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Observações</label>
+          <textarea name="observacoes" class="form-control" rows="3"
+                    placeholder="Informações adicionais...">{{ item.observacoes if item else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary px-4">
+          <i class="bi bi-check-lg me-1"></i> {{ "Salvar Alterações" if item else "Cadastrar" }}
+        </button>
+        <a href="/patrimonio" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

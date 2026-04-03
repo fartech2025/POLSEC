@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Movimentações{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-arrow-left-right me-2 text-primary"></i>Histórico de Movimentações
+  </h4>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Data</th>
+            <th>Patrimônio</th>
+            <th>Tipo</th>
+            <th>Usuário</th>
+            <th>Detalhes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for mov in historico %}
+          <tr>
+            <td><small>{{ mov.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+            <td>
+              <a href="/patrimonio/{{ mov.patrimonio_id }}" class="text-decoration-none">
+                <code>{{ mov.patrimonio.codigo }}</code>
+              </a>
+            </td>
+            <td>
+              {% if mov.tipo.value == 'transferencia_setor' %}
+                <span class="badge bg-primary">Transferência</span>
+              {% elif mov.tipo.value == 'troca_responsavel' %}
+                <span class="badge bg-warning text-dark">Troca Responsável</span>
+              {% elif mov.tipo.value == 'mudanca_status' %}
+                <span class="badge bg-success">Status</span>
+              {% else %}
+                <span class="badge bg-secondary">Edição</span>
+              {% endif %}
+            </td>
+            <td>{{ mov.usuario.nome if mov.usuario else '—' }}</td>
+            <td><small class="text-muted">{{ mov.descricao or '—' }}</small></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i> Nenhuma movimentação registrada.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small bg-white">
+    {{ historico | length }} registro(s)
+  </div>
+</div>
+{% endblock %}

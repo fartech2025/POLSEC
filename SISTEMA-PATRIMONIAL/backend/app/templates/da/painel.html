@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Data Analytics{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-bar-chart-line me-2 text-primary"></i>Data Analytics
+  </h4>
+  <button id="btn-analisar" class="btn btn-primary">
+    <i class="bi bi-stars me-2"></i>Gerar Análise com IA
+  </button>
+</div>
+
+<!-- Estado inicial -->
+<div id="estado-inicial" class="text-center py-5">
+  <div class="mb-4">
+    <i class="bi bi-bar-chart-line display-1 text-muted opacity-25"></i>
+  </div>
+  <h5 class="text-muted">Análise inteligente do acervo patrimonial</h5>
+  <p class="text-muted">
+    Clique em <strong>Gerar Análise com IA</strong> para receber insights automáticos,<br>
+    alertas e recomendações gerados pelo Claude com base nos dados reais.
+  </p>
+  <button class="btn btn-primary btn-lg mt-2" id="btn-analisar-centro">
+    <i class="bi bi-stars me-2"></i>Iniciar Análise
+  </button>
+</div>
+
+<!-- Loading -->
+<div id="estado-carregando" class="d-none text-center py-5">
+  <div class="spinner-border text-primary mb-4" style="width:3rem;height:3rem;"></div>
+  <h5 class="text-muted">Analisando o acervo com IA...</h5>
+  <p class="text-muted small">Claude está processando os dados e gerando insights</p>
+</div>
+
+<!-- Resultado -->
+<div id="resultado" class="d-none">
+
+  <!-- Score de gestão -->
+  <div class="row g-3 mb-4" id="secao-score"></div>
+
+  <!-- Alertas -->
+  <div id="secao-alertas" class="mb-4"></div>
+
+  <!-- Indicadores chave -->
+  <div class="row g-3 mb-4" id="secao-indicadores"></div>
+
+  <!-- Insights + Recomendações -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6" id="secao-insights"></div>
+    <div class="col-lg-6" id="secao-recomendacoes"></div>
+  </div>
+
+  <!-- Resumo executivo -->
+  <div class="card border-0 shadow-sm mb-4" id="secao-resumo"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const NIVEL_COR = { critico: 'danger', atencao: 'warning', info: 'info' };
+const NIVEL_ICON = { critico: 'bi-exclamation-triangle-fill', atencao: 'bi-exclamation-circle-fill', info: 'bi-info-circle-fill' };
+const TENDENCIA_ICON = { positivo: 'bi-arrow-up-circle-fill text-success', negativo: 'bi-arrow-down-circle-fill text-danger', neutro: 'bi-dash-circle-fill text-secondary' };
+const IMPACTO_COR = { alto: 'danger', medio: 'warning', baixo: 'secondary' };
+const PRAZO_COR = { imediato: 'danger', curto_prazo: 'warning', medio_prazo: 'info' };
+const PRAZO_LABEL = { imediato: 'Imediato', curto_prazo: 'Curto prazo', medio_prazo: 'Médio prazo' };
+
+async function analisar() {
+  document.getElementById('estado-inicial').classList.add('d-none');
+  document.getElementById('resultado').classList.add('d-none');
+  document.getElementById('estado-carregando').classList.remove('d-none');
+
+  try {
+    const resp = await fetch('/da/analisar', { method: 'POST' });
+    if (!resp.ok) throw new Error(await resp.text());
+    const dados = await resp.json();
+    renderizar(dados);
+  } catch (e) {
+    document.getElementById('estado-carregando').classList.add('d-none');
+    document.getElementById('estado-inicial').classList.remove('d-none');
+    alert('Erro ao gerar análise: ' + e.message);
+  }
+}
+
+function renderizar(d) {
+  document.getElementById('estado-carregando').classList.add('d-none');
+  document.getElementById('resultado').classList.remove('d-none');
+
+  // Score de gestão
+  const score = d.score_gestao;
+  const corScore = score.nota >= 70 ? 'success' : score.nota >= 40 ? 'warning' : 'danger';
+  document.getElementById('secao-score').innerHTML = `
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body text-center py-4">
+          <div class="display-4 fw-bold text-${corScore}">${score.nota}</div>
+          <div class="text-muted small mb-2">Score de Gestão</div>
+          <div class="progress mb-3" style="height:8px;">
+            <div class="progress-bar bg-${corScore}" style="width:${score.nota}%"></div>
+          </div>
+          <p class="small text-muted mb-0">${score.descricao}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-0 fw-semibold small text-success">
+          <i class="bi bi-check-circle me-1"></i>Pontos Positivos
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0 small">
+            ${score.pontos_positivos.map(p => `<li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>${p}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-0 fw-semibold small text-warning">
+          <i class="bi bi-exclamation-triangle me-1"></i>Pontos de Melhoria
+        </div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0 small">
+            ${score.pontos_melhoria.map(p => `<li class="mb-1"><i class="bi bi-arrow-right text-warning me-1"></i>${p}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    </div>`;
+
+  // Alertas
+  document.getElementById('secao-alertas').innerHTML = d.alertas.map(a => `
+    <div class="alert alert-${NIVEL_COR[a.nivel]} border-0 shadow-sm d-flex gap-3 mb-2">
+      <i class="bi ${NIVEL_ICON[a.nivel]} fs-5 flex-shrink-0 mt-1"></i>
+      <div>
+        <strong>${a.titulo}</strong><br>
+        <span class="small">${a.descricao}</span>
+        ${a.acao_recomendada ? `<br><span class="small fw-semibold">Ação: ${a.acao_recomendada}</span>` : ''}
+      </div>
+    </div>`).join('');
+
+  // Indicadores chave
+  document.getElementById('secao-indicadores').innerHTML = d.indicadores_chave.map(i => `
+    <div class="col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="small text-muted fw-semibold">${i.titulo}</div>
+            <i class="bi ${TENDENCIA_ICON[i.tendencia] || 'bi-dash text-secondary'} fs-5"></i>
+          </div>
+          <div class="fs-4 fw-bold mb-1">${i.valor}</div>
+          <div class="small text-muted">${i.descricao}</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Insights
+  document.getElementById('secao-insights').innerHTML = `
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 fw-semibold">
+        <i class="bi bi-lightbulb me-2 text-warning"></i>Insights
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          ${d.insights.map(i => `
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <span class="small fw-semibold text-muted">${i.categoria}</span>
+                <span class="badge bg-${IMPACTO_COR[i.impacto]}-subtle text-${IMPACTO_COR[i.impacto]} small">${i.impacto}</span>
+              </div>
+              <p class="mb-0 small mt-1">${i.insight}</p>
+            </li>`).join('')}
+        </ul>
+      </div>
+    </div>`;
+
+  // Recomendações
+  document.getElementById('secao-recomendacoes').innerHTML = `
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 fw-semibold">
+        <i class="bi bi-clipboard2-check me-2 text-primary"></i>Recomendações
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          ${d.recomendacoes.map(r => `
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <span class="small fw-bold">${r.prioridade}. ${r.titulo}</span>
+                <span class="badge bg-${PRAZO_COR[r.prazo]}-subtle text-${PRAZO_COR[r.prazo]} small">
+                  ${PRAZO_LABEL[r.prazo] || r.prazo}
+                </span>
+              </div>
+              <p class="mb-0 small text-muted mt-1">${r.descricao}</p>
+            </li>`).join('')}
+        </ul>
+      </div>
+    </div>`;
+
+  // Resumo executivo
+  document.getElementById('secao-resumo').innerHTML = `
+    <div class="card-header bg-white border-0 fw-semibold">
+      <i class="bi bi-file-text me-2 text-primary"></i>Resumo Executivo
+    </div>
+    <div class="card-body">
+      <p class="mb-0">${d.resumo_executivo}</p>
+    </div>`;
+}
+
+document.getElementById('btn-analisar').addEventListener('click', analisar);
+document.getElementById('btn-analisar-centro').addEventListener('click', analisar);
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+psycopg[binary]>=3.2.10
+alembic==1.13.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
+pydantic[email]==2.7.1
+python-multipart==0.0.9
+jinja2==3.1.4
+
+# Supabase (auth + db client)
+supabase>=2.4.0
+python-jose[cryptography]==3.3.0
+
+# IA
+anthropic>=0.40.0
+mcp>=1.0.0
+sse-starlette>=1.6.5

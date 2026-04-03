@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login — Sistema Patrimonial POLSEC</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link href="/static/css/style.css" rel="stylesheet"/>
+</head>
+<body class="login-body">
+  <div class="login-card card shadow-lg">
+    <div class="card-body p-5">
+      <!-- Marca -->
+      <div class="text-center mb-4">
+        <span class="login-brand d-block">POLSEC</span>
+        <span class="login-subtitle d-block mt-1">Sistema de Gestão Patrimonial</span>
+      </div>
+
+      {% if erro %}
+        <div class="alert alert-danger py-2 d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>{{ erro }}</span>
+        </div>
+      {% endif %}
+
+      <form method="POST" action="/auth/login">
+        <div class="mb-3">
+          <label class="form-label fw-semibold" style="font-size:.85rem;letter-spacing:.04em;">E-mail</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white">
+              <i class="bi bi-envelope" style="color:#ff4e17;"></i>
+            </span>
+            <input type="email" name="email" class="form-control"
+                   placeholder="seu@email.com" required autofocus/>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-semibold" style="font-size:.85rem;letter-spacing:.04em;">Senha</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white">
+              <i class="bi bi-lock" style="color:#ff4e17;"></i>
+            </span>
+            <input type="password" name="senha" class="form-control"
+                   placeholder="••••••••" required/>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-brand w-100">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Entrar
+        </button>
+      </form>
+
+      <hr class="my-4"/>
+      <div class="text-center">
+        <small class="text-muted" style="font-size:.8rem;">Sua empresa ainda não tem conta?</small><br/>
+        <a href="/empresa/registrar" class="btn btn-outline-brand btn-sm mt-2">
+          <i class="bi bi-building-add me-1"></i> Cadastrar empresa
+        </a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

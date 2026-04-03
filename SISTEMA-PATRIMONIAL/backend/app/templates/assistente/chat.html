@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Assistente IA{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-robot me-2 text-primary"></i>Assistente Patrimonial
+  </h4>
+  <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2">
+    <i class="bi bi-stars me-1"></i>Powered by Claude
+  </span>
+</div>
+
+<div class="row g-3" style="height: calc(100vh - 180px);">
+  <!-- Chat principal -->
+  <div class="col-lg-8 d-flex flex-column">
+    <div class="card border-0 shadow-sm flex-grow-1 d-flex flex-column">
+
+      <!-- Mensagens -->
+      <div id="chat-mensagens" class="flex-grow-1 overflow-auto p-4"
+           style="max-height: calc(100vh - 320px);">
+
+        <!-- Mensagem de boas-vindas -->
+        <div class="d-flex gap-3 mb-4">
+          <div class="flex-shrink-0">
+            <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center"
+                 style="width:38px;height:38px;">
+              <i class="bi bi-robot text-white"></i>
+            </div>
+          </div>
+          <div class="bg-light rounded-3 p-3 flex-grow-1">
+            <p class="mb-1 fw-semibold small text-muted">Assistente POLSEC</p>
+            <p class="mb-0">Olá! Sou o assistente inteligente de gestão patrimonial da POLSEC.
+              Posso consultar bens, gerar relatórios e responder perguntas sobre o acervo em tempo real.
+              Como posso ajudar?</p>
+            <div class="mt-2 d-flex flex-wrap gap-2">
+              <button class="btn btn-sm btn-outline-primary atalho"
+                data-msg="Quantos bens temos no total e qual a distribuição por status?">
+                Resumo geral
+              </button>
+              <button class="btn btn-sm btn-outline-primary atalho"
+                data-msg="Quais bens estão extraviados ou em manutenção?">
+                Bens críticos
+              </button>
+              <button class="btn btn-sm btn-outline-primary atalho"
+                data-msg="Quais setores têm mais patrimônios?">
+                Por setor
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="p-3 border-top bg-white">
+        <div id="indicador-ferramenta" class="d-none mb-2">
+          <small class="text-muted">
+            <span class="spinner-border spinner-border-sm me-1"></span>
+            Consultando: <span id="nome-ferramenta" class="fw-semibold text-primary"></span>
+          </small>
+        </div>
+        <div class="input-group">
+          <textarea id="input-chat"
+                    class="form-control"
+                    rows="2"
+                    placeholder="Pergunte sobre o acervo patrimonial..."
+                    style="resize:none;"></textarea>
+          <button id="btn-enviar" class="btn btn-primary px-4">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+        <small class="text-muted mt-1 d-block">
+          <kbd>Ctrl+Enter</kbd> para enviar
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel lateral -->
+  <div class="col-lg-4 d-flex flex-column gap-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-lightning-charge me-2 text-warning"></i>Consultas rápidas
+      </div>
+      <div class="card-body d-flex flex-column gap-2 p-3">
+        {% set atalhos = [
+          ("Listar bens ativos no setor Administrativo", "bi-building"),
+          ("Mostrar histórico de movimentações recentes", "bi-clock-history"),
+          ("Quantos bens não têm responsável?", "bi-person-x"),
+          ("Buscar patrimônio PAT-001", "bi-search"),
+          ("Valor total do acervo ativo", "bi-currency-dollar"),
+        ] %}
+        {% for msg, icon in atalhos %}
+        <button class="btn btn-sm btn-outline-secondary text-start atalho" data-msg="{{ msg }}">
+          <i class="bi {{ icon }} me-2 text-primary"></i>{{ msg }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold small">
+        <i class="bi bi-info-circle me-2 text-primary"></i>Capacidades
+      </div>
+      <div class="card-body p-3">
+        <ul class="list-unstyled mb-0 small">
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Busca inteligente no acervo</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Estatísticas em tempo real</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Histórico de movimentações</li>
+          <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i>Análise por setor/categoria</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Relatórios sob demanda</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chatEl = document.getElementById('chat-mensagens');
+const inputEl = document.getElementById('input-chat');
+const btnEnviar = document.getElementById('btn-enviar');
+const indicadorFerramenta = document.getElementById('indicador-ferramenta');
+const nomeFerramenta = document.getElementById('nome-ferramenta');
+
+let historico = [];
+let aguardando = false;
+
+function scrollBaixo() {
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function adicionarMensagem(role, conteudo) {
+  const isUser = role === 'user';
+  const html = `
+    <div class="d-flex gap-3 mb-4 ${isUser ? 'flex-row-reverse' : ''}">
+      <div class="flex-shrink-0">
+        <div class="rounded-circle d-flex align-items-center justify-content-center
+             ${isUser ? 'bg-secondary' : 'bg-primary'}"
+             style="width:38px;height:38px;">
+          <i class="bi ${isUser ? 'bi-person-fill' : 'bi-robot'} text-white"></i>
+        </div>
+      </div>
+      <div class="${isUser ? 'bg-primary text-white' : 'bg-light'} rounded-3 p-3"
+           style="max-width:85%;">
+        <p class="mb-1 fw-semibold small ${isUser ? 'text-white-50' : 'text-muted'}">
+          ${isUser ? 'Você' : 'Assistente POLSEC'}
+        </p>
+        <div class="msg-conteudo mb-0">${conteudo}</div>
+      </div>
+    </div>`;
+  chatEl.insertAdjacentHTML('beforeend', html);
+  scrollBaixo();
+  return chatEl.lastElementChild.querySelector('.msg-conteudo');
+}
+
+function criarBolhaAssistente() {
+  const html = `
+    <div class="d-flex gap-3 mb-4" id="bolha-ativa">
+      <div class="flex-shrink-0">
+        <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center"
+             style="width:38px;height:38px;">
+          <i class="bi bi-robot text-white"></i>
+        </div>
+      </div>
+      <div class="bg-light rounded-3 p-3" style="max-width:85%;">
+        <p class="mb-1 fw-semibold small text-muted">Assistente POLSEC</p>
+        <div class="msg-conteudo mb-0">
+          <span class="spinner-border spinner-border-sm text-primary me-2"></span>
+          <span class="text-muted small">Pensando...</span>
+        </div>
+      </div>
+    </div>`;
+  chatEl.insertAdjacentHTML('beforeend', html);
+  scrollBaixo();
+  return document.getElementById('bolha-ativa').querySelector('.msg-conteudo');
+}
+
+async function enviar(texto) {
+  if (aguardando || !texto.trim()) return;
+  aguardando = true;
+  btnEnviar.disabled = true;
+  inputEl.value = '';
+
+  adicionarMensagem('user', texto.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+  historico.push({ role: 'user', content: texto });
+
+  const alvo = criarBolhaAssistente();
+  let textoAcumulado = '';
+
+  try {
+    const resp = await fetch('/assistente/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mensagens: historico }),
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const linhas = decoder.decode(value).split('\n');
+      for (const linha of linhas) {
+        if (!linha.startsWith('data: ')) continue;
+        const dados = JSON.parse(linha.slice(6));
+
+        if (dados.tipo === 'texto') {
+          textoAcumulado += dados.conteudo;
+          // Converte markdown simples
+          const html = textoAcumulado
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+          alvo.innerHTML = html;
+          scrollBaixo();
+
+        } else if (dados.tipo === 'ferramenta') {
+          indicadorFerramenta.classList.remove('d-none');
+          nomeFerramenta.textContent = dados.nome.replace(/_/g, ' ');
+
+        } else if (dados.tipo === 'fim') {
+          indicadorFerramenta.classList.add('d-none');
+          historico.push({ role: 'assistant', content: textoAcumulado });
+          // Remove o id para não conflitar na próxima mensagem
+          document.getElementById('bolha-ativa')?.removeAttribute('id');
+        }
+      }
+    }
+  } catch (e) {
+    alvo.innerHTML = '<span class="text-danger">Erro ao conectar ao assistente.</span>';
+  }
+
+  indicadorFerramenta.classList.add('d-none');
+  aguardando = false;
+  btnEnviar.disabled = false;
+  inputEl.focus();
+}
+
+btnEnviar.addEventListener('click', () => enviar(inputEl.value));
+
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.ctrlKey) enviar(inputEl.value);
+});
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.atalho');
+  if (btn) enviar(btn.dataset.msg);
+});
+</script>
+{% endblock %}

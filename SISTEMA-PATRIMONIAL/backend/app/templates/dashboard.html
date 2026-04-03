@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold"><i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard</h4>
+  <small class="text-muted">Visão geral em tempo real</small>
+</div>
+
+<!-- Cards de status -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-3 p-3 bg-primary bg-opacity-10">
+          <i class="bi bi-boxes fs-3 text-primary"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold text-primary">{{ total }}</div>
+          <div class="text-muted small">Total de Bens</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-3 p-3 bg-success bg-opacity-10">
+          <i class="bi bi-check-circle fs-3 text-success"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold text-success">{{ status_map.ativo }}</div>
+          <div class="text-muted small">Ativos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-3 p-3 bg-warning bg-opacity-10">
+          <i class="bi bi-tools fs-3 text-warning"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold text-warning">{{ status_map.manutencao }}</div>
+          <div class="text-muted small">Em Manutenção</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-3 p-3 bg-danger bg-opacity-10">
+          <i class="bi bi-exclamation-triangle fs-3 text-danger"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold text-danger">{{ status_map.extraviado }}</div>
+          <div class="text-muted small">Extraviados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Distribuição por setor -->
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 fw-semibold">
+        <i class="bi bi-bar-chart me-2 text-primary"></i>Bens por Setor
+      </div>
+      <div class="card-body">
+        {% if por_setor %}
+          {% set max_val = por_setor[0][1] %}
+          {% for setor, qtd in por_setor %}
+            <div class="mb-2">
+              <div class="d-flex justify-content-between mb-1">
+                <small class="fw-semibold">{{ setor }}</small>
+                <small class="text-muted">{{ qtd }}</small>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar bg-primary"
+                     style="width: {{ (qtd / max_val * 100) | int }}%"></div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted text-center py-3">Nenhum dado disponível.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 fw-semibold">
+        <i class="bi bi-pie-chart me-2 text-primary"></i>Distribuição por Status
+      </div>
+      <div class="card-body">
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <span><span class="badge bg-success me-2">●</span> Ativo</span>
+            <span class="fw-bold">{{ status_map.ativo }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <span><span class="badge bg-warning me-2">●</span> Manutenção</span>
+            <span class="fw-bold">{{ status_map.manutencao }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <span><span class="badge bg-secondary me-2">●</span> Baixado</span>
+            <span class="fw-bold">{{ status_map.baixado }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <span><span class="badge bg-danger me-2">●</span> Extraviado</span>
+            <span class="fw-bold">{{ status_map.extraviado }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

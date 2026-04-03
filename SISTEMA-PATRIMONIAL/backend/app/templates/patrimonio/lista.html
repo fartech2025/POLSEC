@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Patrimônios{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Patrimônios</h4>
+  <a href="/patrimonio/novo" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i> Novo Bem
+  </a>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="GET" action="/patrimonio" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Buscar</label>
+        <input type="text" name="busca" class="form-control" placeholder="Código ou descrição..."
+               value="{{ busca or '' }}"/>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Setor</label>
+        <select name="setor" class="form-select">
+          <option value="">Todos os setores</option>
+          {% for s in setores %}
+            <option value="{{ s }}" {% if setor == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Status</label>
+        <select name="status_filtro" class="form-select">
+          <option value="">Todos</option>
+          {% for s in status_opcoes %}
+            <option value="{{ s.value }}" {% if status_filtro == s.value %}selected{% endif %}>
+              {{ s.value | capitalize }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">
+          <i class="bi bi-search me-1"></i> Filtrar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Descrição</th>
+            <th>Categoria</th>
+            <th>Setor</th>
+            <th>Responsável</th>
+            <th>Status</th>
+            <th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+          <tr>
+            <td><code>{{ item.codigo }}</code></td>
+            <td>{{ item.descricao }}</td>
+            <td><span class="badge bg-light text-dark border">{{ item.categoria }}</span></td>
+            <td>{{ item.setor }}</td>
+            <td>{{ item.responsavel.nome if item.responsavel else '—' }}</td>
+            <td>
+              {% if item.status.value == 'ativo' %}
+                <span class="badge bg-success">Ativo</span>
+              {% elif item.status.value == 'manutencao' %}
+                <span class="badge bg-warning text-dark">Manutenção</span>
+              {% elif item.status.value == 'baixado' %}
+                <span class="badge bg-secondary">Baixado</span>
+              {% elif item.status.value == 'extraviado' %}
+                <span class="badge bg-danger">Extraviado</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <a href="/patrimonio/{{ item.id }}" class="btn btn-sm btn-outline-secondary me-1"
+                 title="Ver detalhes"><i class="bi bi-eye"></i></a>
+              <a href="/patrimonio/{{ item.id }}/editar" class="btn btn-sm btn-outline-primary"
+                 title="Editar"><i class="bi bi-pencil"></i></a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i> Nenhum patrimônio encontrado.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small bg-white">
+    {{ itens | length }} registro(s) encontrado(s)
+  </div>
+</div>
+{% endblock %}
