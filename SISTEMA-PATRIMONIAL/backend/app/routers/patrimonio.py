@@ -33,13 +33,19 @@ def listar(
     busca: Optional[str] = None,
     setor: Optional[str] = None,
     status_filtro: Optional[str] = None,
+    categoria: Optional[str] = None,
+    page: int = 1,
     db: Session = Depends(get_db),
     usuario=Depends(get_usuario_logado),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
     service = PatrimonioService(db, tenant.id)
-    itens = service.listar(busca=busca, setor=setor, status=status_filtro)
+    itens, total, total_pages = service.listar(
+        busca=busca, setor=setor, status=status_filtro, categoria=categoria, page=page
+    )
     setores = service.listar_setores()
+    categorias = service.listar_categorias()
+    kpis = service.contar_por_status()
     return templates.TemplateResponse(
         "patrimonio/lista.html",
         {
@@ -47,10 +53,17 @@ def listar(
             "usuario": usuario,
             "tenant": tenant,
             "itens": itens,
+            "total": total,
+            "page": page,
+            "total_pages": total_pages,
+            "per_page": service.PER_PAGE,
             "setores": setores,
-            "busca": busca,
-            "setor": setor,
-            "status_filtro": status_filtro,
+            "categorias": categorias,
+            "kpis": kpis,
+            "busca": busca or "",
+            "setor": setor or "",
+            "categoria": categoria or "",
+            "status_filtro": status_filtro or "",
             "status_opcoes": StatusPatrimonio,
         },
     )

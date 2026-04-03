@@ -1,4 +1,5 @@
-from typing import List, Optional
+from math import ceil
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -14,12 +15,17 @@ class PatrimonioService:
         self.db = db
         self.tenant_id = tenant_id
 
+    PER_PAGE = 50
+
     def listar(
         self,
         busca: Optional[str] = None,
         setor: Optional[str] = None,
         status: Optional[str] = None,
-    ) -> List[Patrimonio]:
+        categoria: Optional[str] = None,
+        page: int = 1,
+    ) -> Tuple[List[Patrimonio], int, int]:
+        """Retorna (itens, total, total_pages) com paginação."""
         query = self.db.query(Patrimonio).filter(
             Patrimonio.tenant_id == self.tenant_id
         )
@@ -28,12 +34,20 @@ class PatrimonioService:
             query = query.filter(
                 Patrimonio.codigo.ilike(termo)
                 | Patrimonio.descricao.ilike(termo)
+                | Patrimonio.localizacao.ilike(termo)
             )
         if setor:
             query = query.filter(Patrimonio.setor == setor)
         if status:
             query = query.filter(Patrimonio.status == StatusPatrimonio(status))
-        return query.order_by(Patrimonio.codigo).all()
+        if categoria:
+            query = query.filter(Patrimonio.categoria == categoria)
+        total = query.count()
+        total_pages = max(1, ceil(total / self.PER_PAGE))
+        page = max(1, min(page, total_pages))
+        offset = (page - 1) * self.PER_PAGE
+        itens = query.order_by(Patrimonio.codigo).offset(offset).limit(self.PER_PAGE).all()
+        return itens, total, total_pages
 
     def buscar_por_id(self, patrimonio_id: int) -> Optional[Patrimonio]:
         return (
@@ -48,11 +62,32 @@ class PatrimonioService:
     def listar_setores(self) -> List[str]:
         resultados = (
             self.db.query(Patrimonio.setor)
-            .filter(Patrimonio.tenant_id == self.tenant_id)
+            .filter(Patrimonio.tenant_id == self.tenant_id, Patrimonio.setor.isnot(None))
             .distinct()
+            .order_by(Patrimonio.setor)
             .all()
         )
-        return [r[0] for r in resultados]
+        return [r[0] for r in resultados if r[0]]
+
+    def listar_categorias(self) -> List[str]:
+        resultados = (
+            self.db.query(Patrimonio.categoria)
+            .filter(Patrimonio.tenant_id == self.tenant_id, Patrimonio.categoria.isnot(None))
+            .distinct()
+            .order_by(Patrimonio.categoria)
+            .all()
+        )
+        return [r[0] for r in resultados if r[0]]
+
+    def contar_por_status(self) -> Dict[str, int]:
+        from sqlalchemy import func
+        rows = (
+            self.db.query(Patrimonio.status, func.count(Patrimonio.id))
+            .filter(Patrimonio.tenant_id == self.tenant_id)
+            .group_by(Patrimonio.status)
+            .all()
+        )
+        return {r[0].value if r[0] else "sem_status": r[1] for r in rows}
 
     def listar_responsaveis(self) -> List[Usuario]:
         return (

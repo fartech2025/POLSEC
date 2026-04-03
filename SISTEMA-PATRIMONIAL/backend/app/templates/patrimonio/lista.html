@@ -2,7 +2,7 @@
 {% block title %}Patrimônios{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Patrimônios</h4>
   {% if usuario.perfil.value != 'visualizador' %}
   <a href="/patrimonio/novo" class="btn btn-primary">
@@ -11,25 +11,62 @@
   {% endif %}
 </div>
 
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fs-3 fw-bold text-primary">{{ total }}</div>
+      <div class="text-muted small">Total (filtrado)</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fs-3 fw-bold text-success">{{ kpis.get('ativo', 0) }}</div>
+      <div class="text-muted small">Ativos</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fs-3 fw-bold text-warning">{{ kpis.get('manutencao', 0) }}</div>
+      <div class="text-muted small">Manutenção</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center py-3">
+      <div class="fs-3 fw-bold text-secondary">{{ kpis.get('baixado', 0) + kpis.get('extraviado', 0) }}</div>
+      <div class="text-muted small">Baixados / Extraviados</div>
+    </div>
+  </div>
+</div>
+
 <!-- Filtros -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body">
     <form method="GET" action="/patrimonio" class="row g-2 align-items-end">
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold">Buscar</label>
-        <input type="text" name="busca" class="form-control" placeholder="Código ou descrição..."
-               value="{{ busca or '' }}"/>
-      </div>
       <div class="col-md-3">
+        <label class="form-label small fw-semibold">Buscar</label>
+        <input type="text" name="busca" class="form-control" placeholder="Código, descrição ou local..."
+               value="{{ busca }}"/>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">Categoria</label>
+        <select name="categoria" class="form-select">
+          <option value="">Todas</option>
+          {% for c in categorias %}
+            <option value="{{ c }}" {% if categoria == c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
         <label class="form-label small fw-semibold">Setor</label>
         <select name="setor" class="form-select">
-          <option value="">Todos os setores</option>
+          <option value="">Todos</option>
           {% for s in setores %}
             <option value="{{ s }}" {% if setor == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label small fw-semibold">Status</label>
         <select name="status_filtro" class="form-select">
           <option value="">Todos</option>
@@ -45,6 +82,11 @@
           <i class="bi bi-search me-1"></i> Filtrar
         </button>
       </div>
+      <div class="col-md-1">
+        <a href="/patrimonio" class="btn btn-outline-secondary w-100" title="Limpar filtros">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      </div>
     </form>
   </div>
 </div>
@@ -59,8 +101,9 @@
             <th>Código</th>
             <th>Descrição</th>
             <th>Categoria</th>
-            <th>Setor</th>
+            <th>Setor / Local</th>
             <th>Responsável</th>
+            <th class="text-end">Valor (R$)</th>
             <th>Status</th>
             <th class="text-center">Ações</th>
           </tr>
@@ -68,11 +111,19 @@
         <tbody>
           {% for item in itens %}
           <tr>
-            <td><code>{{ item.codigo }}</code></td>
+            <td><code class="text-primary">{{ item.codigo }}</code></td>
             <td>{{ item.descricao }}</td>
-            <td><span class="badge bg-light text-dark border">{{ item.categoria }}</span></td>
-            <td>{{ item.setor }}</td>
+            <td><span class="badge bg-light text-dark border">{{ item.categoria or '—' }}</span></td>
+            <td>
+              <div>{{ item.setor or '—' }}</div>
+              {% if item.localizacao %}<small class="text-muted">{{ item.localizacao }}</small>{% endif %}
+            </td>
             <td>{{ item.responsavel.nome if item.responsavel else '—' }}</td>
+            <td class="text-end">
+              {% if item.valor %}
+                {{ "%.2f" | format(item.valor) }}
+              {% else %}—{% endif %}
+            </td>
             <td>
               {% if item.status.value == 'ativo' %}
                 <span class="badge bg-success">Ativo</span>
@@ -87,13 +138,15 @@
             <td class="text-center">
               <a href="/patrimonio/{{ item.id }}" class="btn btn-sm btn-outline-secondary me-1"
                  title="Ver detalhes"><i class="bi bi-eye"></i></a>
+              {% if usuario.perfil.value != 'visualizador' %}
               <a href="/patrimonio/{{ item.id }}/editar" class="btn btn-sm btn-outline-primary"
                  title="Editar"><i class="bi bi-pencil"></i></a>
+              {% endif %}
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4">
+            <td colspan="8" class="text-center text-muted py-4">
               <i class="bi bi-inbox fs-4 d-block mb-2"></i> Nenhum patrimônio encontrado.
             </td>
           </tr>
@@ -102,8 +155,57 @@
       </table>
     </div>
   </div>
-  <div class="card-footer text-muted small bg-white">
-    {{ itens | length }} registro(s) encontrado(s)
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="text-muted small">
+      {% set inicio = (page - 1) * per_page + 1 %}
+      {% set fim = [page * per_page, total] | min %}
+      {% if total > 0 %}
+        Exibindo {{ inicio }}–{{ fim }} de <strong>{{ total }}</strong> registro(s)
+        &nbsp;·&nbsp; Página {{ page }} de {{ total_pages }}
+      {% else %}
+        Nenhum registro
+      {% endif %}
+    </span>
+
+    {% if total_pages > 1 %}
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        <!-- Primeira / Anterior -->
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link" href="?page=1&busca={{ busca }}&setor={{ setor }}&categoria={{ categoria }}&status_filtro={{ status_filtro }}" title="Primeira">&laquo;</a>
+        </li>
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link" href="?page={{ page - 1 }}&busca={{ busca }}&setor={{ setor }}&categoria={{ categoria }}&status_filtro={{ status_filtro }}">‹</a>
+        </li>
+
+        <!-- Janela de páginas -->
+        {% set p_start = [1, page - 2] | max %}
+        {% set p_end   = [total_pages, page + 2] | min %}
+
+        {% if p_start > 1 %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+
+        {% for p in range(p_start, p_end + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" href="?page={{ p }}&busca={{ busca }}&setor={{ setor }}&categoria={{ categoria }}&status_filtro={{ status_filtro }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+
+        {% if p_end < total_pages %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+
+        <!-- Próxima / Última -->
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+          <a class="page-link" href="?page={{ page + 1 }}&busca={{ busca }}&setor={{ setor }}&categoria={{ categoria }}&status_filtro={{ status_filtro }}">›</a>
+        </li>
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+          <a class="page-link" href="?page={{ total_pages }}&busca={{ busca }}&setor={{ setor }}&categoria={{ categoria }}&status_filtro={{ status_filtro }}" title="Última">&raquo;</a>
+        </li>
+      </ul>
+    </nav>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
