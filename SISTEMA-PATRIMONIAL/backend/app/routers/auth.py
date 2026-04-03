@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.models.tenant import Tenant
+from app.models.usuario import Usuario
 from app.services.auth_service import login_com_supabase, logout_supabase
 
 router = APIRouter()
@@ -38,7 +40,23 @@ def login(
     # Extrai o tenant slug dos metadados do token (sem verificar assinatura — já verificado acima)
     from jose import jwt as _jwt
     _claims = _jwt.get_unverified_claims(tokens["access_token"])
-    tenant_slug = _claims.get("user_metadata", {}).get("slug") or _claims.get("slug")
+    tenant_slug = (
+        _claims.get("user_metadata", {}).get("slug")
+        or _claims.get("slug")
+    )
+
+    # Fallback: se o Supabase não emitiu o slug no JWT, busca pelo supabase_uid no banco
+    if not tenant_slug:
+        supabase_uid = _claims.get("sub")
+        if supabase_uid:
+            usuario = db.query(Usuario).filter(
+                Usuario.supabase_uid == supabase_uid,
+                Usuario.ativo == True,
+            ).first()
+            if usuario:
+                t = db.query(Tenant).filter(Tenant.id == usuario.tenant_id).first()
+                if t:
+                    tenant_slug = t.slug
 
     response = RedirectResponse(url="/dashboard", status_code=302)
     response.set_cookie(
