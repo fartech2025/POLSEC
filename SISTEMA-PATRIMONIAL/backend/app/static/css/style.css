@@ -3,8 +3,8 @@
    Manual de Diretrizes Visuais aplicado
    ============================================================ */
 
-/* Importação tipográfica — Inter como fallback de Helixa */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap');
+/* Importação tipográfica — Barlow como substituto visual de Helixa */
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;700&display=swap');
 
 /* ── Variáveis da marca ──────────────────────────────────── */
 :root {
@@ -20,7 +20,7 @@
   --surface-light:  #f2f2f2;
 
   /* Tipografia */
-  --font-brand: 'Helixa', 'Inter', system-ui, sans-serif;
+  --font-brand: 'Helixa', 'Barlow', system-ui, sans-serif;
 
   /* Bootstrap overrides */
   --bs-primary:     #ff4e17;
