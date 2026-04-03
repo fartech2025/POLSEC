@@ -35,6 +35,11 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+    # Extrai o tenant slug dos metadados do token (sem verificar assinatura — já verificado acima)
+    from jose import jwt as _jwt
+    _claims = _jwt.get_unverified_claims(tokens["access_token"])
+    tenant_slug = _claims.get("user_metadata", {}).get("slug") or _claims.get("slug")
+
     response = RedirectResponse(url="/dashboard", status_code=302)
     response.set_cookie(
         key="access_token",
@@ -52,6 +57,15 @@ def login(
         samesite="lax",
         max_age=7 * 24 * 3600,
     )
+    if tenant_slug:
+        response.set_cookie(
+            key="tenant_slug",
+            value=tenant_slug,
+            httponly=False,   # lido pelo middleware sem JS
+            secure=_SECURE_COOKIE,
+            samesite="lax",
+            max_age=7 * 24 * 3600,
+        )
     return response
 
 

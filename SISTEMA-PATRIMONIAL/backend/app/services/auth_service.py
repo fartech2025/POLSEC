@@ -8,6 +8,8 @@ from functools import lru_cache
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
+from jose.backends import ECKey
+import httpx
 from sqlalchemy.orm import Session
 from supabase import create_client, Client
 
@@ -77,21 +79,51 @@ def solicitar_reset_senha(email: str) -> None:
 
 # ── Validação de JWT ──────────────────────────────────────────────────────────
 
+@lru_cache(maxsize=1)
+def _get_jwks() -> dict:
+    """Busca as chaves públicas do Supabase (cacheadas em memória)."""
+    url = f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+    resp = httpx.get(url, headers={"apikey": settings.SUPABASE_ANON_KEY}, timeout=5)
+    resp.raise_for_status()
+    return {k["kid"]: k for k in resp.json().get("keys", [])}
+
+
 def decodificar_token(token: str) -> Optional[dict]:
     """
-    Valida o JWT do Supabase com HS256 usando o JWT Secret do projeto.
-    O Supabase suporta tanto RS256 (padrão) quanto HS256 (legado).
-    Para RS256 configurar SUPABASE_JWT_SECRET com a chave pública.
+    Valida o JWT emitido pelo Supabase.
+    Suporta ES256 (padrão atual) via JWKS e HS256 (legado) via JWT secret.
     """
     try:
-        payload = jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+
+        if alg == "ES256":
+            kid = header.get("kid")
+            jwks = _get_jwks()
+            key_data = jwks.get(kid)
+            if not key_data:
+                # Chave expirou/rotacionou — limpa cache e tenta novamente
+                _get_jwks.cache_clear()
+                jwks = _get_jwks()
+                key_data = jwks.get(kid)
+            if not key_data:
+                return None
+            public_key = ECKey(key_data, algorithm="ES256")
+            payload = jwt.decode(
+                token,
+                public_key,
+                algorithms=["ES256"],
+                options={"verify_aud": False},
+            )
+        else:
+            payload = jwt.decode(
+                token,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
         return payload
-    except JWTError:
+    except (JWTError, Exception):
         return None
 
 
