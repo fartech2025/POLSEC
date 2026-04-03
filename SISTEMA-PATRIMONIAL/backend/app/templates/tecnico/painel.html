@@ -316,3 +316,24 @@
 </div>
 
 {% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    // Abre o modal se a URL tiver #novo (vindo da sidebar de outra página)
+    if (window.location.hash === '#novo') {
+      var el = document.getElementById('modalNovoChamado');
+      if (el) { new bootstrap.Modal(el).show(); }
+      history.replaceState(null, '', window.location.pathname);
+    }
+    // Clique no link da sidebar estando já no painel: abre modal direto
+    var link = document.getElementById('linkNovoChamado');
+    if (link) {
+      link.addEventListener('click', function (e) {
+        var el = document.getElementById('modalNovoChamado');
+        if (el) { e.preventDefault(); new bootstrap.Modal(el).show(); }
+      });
+    }
+  })();
+</script>
+{% endblock %}
