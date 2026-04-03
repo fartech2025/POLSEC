@@ -23,10 +23,11 @@ templates = Jinja2Templates(directory="app/templates")
 # ── Guard ─────────────────────────────────────────────────────────────────────
 
 def _exigir_operador(usuario: Usuario = Depends(get_usuario_logado)) -> Usuario:
-    if usuario.perfil not in (PerfilUsuario.operador, PerfilUsuario.administrador):
+    # superadmin pode navegar por qualquer interface para suporte/debug
+    if usuario.perfil == PerfilUsuario.visualizador:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a técnicos e administradores.",
+            detail="Visualizadores não têm acesso ao painel de técnicos.",
         )
     return usuario
 
@@ -54,6 +55,9 @@ def painel_tecnico(
     usuario: Usuario = Depends(_exigir_operador),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
+    # superadmin não tem painel técnico — redireciona ao seu próprio dashboard
+    if usuario.perfil == PerfilUsuario.superadmin:
+        return RedirectResponse(url="/superadmin", status_code=302)
     funcionario = _get_funcionario(usuario, tenant, db)
 
     q = (
