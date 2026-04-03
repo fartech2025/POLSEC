@@ -18,7 +18,12 @@ _SECURE_COOKIE = not settings.DEBUG
 
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    # Limpa cookies antigos ao exibir a página de login (troca de usuário)
+    response = templates.TemplateResponse("login.html", {"request": request})
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    response.delete_cookie("tenant_slug")
+    return response
 
 
 @router.post("/login")
@@ -30,7 +35,9 @@ def login(
 ):
     try:
         tokens = login_com_supabase(email, senha)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger("polsec.auth").error("Falha login %s: %s", email, exc)
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "erro": "E-mail ou senha incorretos."},
