@@ -111,6 +111,12 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link {% if request.url.path == '/tecnico/chamado/novo' %}active{% endif %}"
+           href="/tecnico/chamado/novo">
+          <i class="bi bi-plus-circle me-2"></i><span>Novo Chamado</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {% if request.url.path.startswith('/patrimonio') %}active{% endif %}"
            href="/patrimonio">
           <i class="bi bi-box-seam me-2"></i><span>Patrimônios</span>

@@ -10,8 +10,9 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.chamado import Chamado, StatusChamado
+from app.models.chamado import Chamado, PrioridadeChamado, StatusChamado
 from app.models.funcionario import Funcionario
+from app.models.patrimonio import Patrimonio
 from app.models.usuario import PerfilUsuario, Usuario
 from app.services.auth_service import get_tenant_atual, get_usuario_logado
 from app.models.tenant import Tenant
@@ -106,6 +107,85 @@ def painel_tecnico(
             "StatusChamado": StatusChamado,
         },
     )
+
+
+# ── Novo chamado — formulário ─────────────────────────────────────────────────
+
+@router.get("/chamado/novo", response_class=HTMLResponse)
+def form_novo_chamado(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_operador),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    if usuario.perfil == PerfilUsuario.superadmin:
+        return RedirectResponse(url="/superadmin", status_code=302)
+
+    patrimonios = (
+        db.query(Patrimonio)
+        .filter(Patrimonio.tenant_id == tenant.id)
+        .order_by(Patrimonio.codigo)
+        .all()
+    )
+    funcionarios = (
+        db.query(Funcionario)
+        .filter(Funcionario.tenant_id == tenant.id, Funcionario.ativo == True)
+        .order_by(Funcionario.nome)
+        .all()
+    )
+    funcionario_logado = _get_funcionario(usuario, tenant, db)
+
+    return templates.TemplateResponse(
+        "tecnico/novo_chamado.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "tenant": tenant,
+            "patrimonios": patrimonios,
+            "funcionarios": funcionarios,
+            "funcionario_logado": funcionario_logado,
+            "PrioridadeChamado": PrioridadeChamado,
+            "erro": None,
+        },
+    )
+
+
+@router.post("/chamado/novo", response_class=HTMLResponse)
+def criar_chamado(
+    request: Request,
+    patrimonio_id: int = Form(...),
+    titulo: str = Form(...),
+    descricao: str = Form(...),
+    prioridade: str = Form(...),
+    solicitante_id: int = Form(...),
+    tecnico_id: int = Form(default=0),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_operador),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    if usuario.perfil == PerfilUsuario.superadmin:
+        return RedirectResponse(url="/superadmin", status_code=302)
+
+    try:
+        prioridade_enum = PrioridadeChamado(prioridade)
+    except ValueError:
+        prioridade_enum = PrioridadeChamado.media
+
+    chamado = Chamado(
+        tenant_id=tenant.id,
+        patrimonio_id=patrimonio_id,
+        solicitante_id=solicitante_id,
+        tecnico_id=tecnico_id if tecnico_id else None,
+        titulo=titulo.strip(),
+        descricao=descricao.strip(),
+        prioridade=prioridade_enum,
+        status=StatusChamado.aberto,
+        data_abertura=datetime.utcnow(),
+    )
+    db.add(chamado)
+    db.commit()
+    db.refresh(chamado)
+    return RedirectResponse(url=f"/tecnico/chamado/{chamado.id}", status_code=303)
 
 
 # ── Detalhe do chamado ────────────────────────────────────────────────────────
