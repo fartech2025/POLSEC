@@ -15,7 +15,9 @@ from app.models.usuario import PerfilUsuario, Usuario
 from app.models.tenant import Tenant
 from app.models.cargo import Cargo
 from app.models.filial import Filial
+from app.models.sla import SLAConfig
 from app.services.auth_service import get_tenant_atual, get_usuario_logado
+from app.services.sla_service import seed_sla_padrao
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -287,3 +289,89 @@ def alterar_perfil(
     u.perfil = perfil
     db.commit()
     return RedirectResponse(url="/admin/usuarios", status_code=303)
+
+
+# ── Configurações de SLA ───────────────────────────────────────────────────────
+
+_PRIORIDADES_ORDEM = ["critica", "alta", "media", "baixa"]
+
+
+@router.get("/sla", response_class=HTMLResponse)
+def admin_sla(
+    request: Request,
+    msg: str = "",
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_admin),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    configs = {
+        c.prioridade: c
+        for c in db.query(SLAConfig).filter(SLAConfig.tenant_id == tenant.id).all()
+    }
+    return templates.TemplateResponse(
+        "admin/sla.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "tenant": tenant,
+            "configs": configs,
+            "prioridades": _PRIORIDADES_ORDEM,
+            "msg": msg,
+        },
+    )
+
+
+@router.post("/sla")
+def admin_sla_salvar(
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_admin),
+    tenant: Tenant = Depends(get_tenant_atual),
+    critica_resposta: float = Form(...),
+    critica_resolucao: float = Form(...),
+    alta_resposta: float = Form(...),
+    alta_resolucao: float = Form(...),
+    media_resposta: float = Form(...),
+    media_resolucao: float = Form(...),
+    baixa_resposta: float = Form(...),
+    baixa_resolucao: float = Form(...),
+):
+    dados = {
+        "critica": (critica_resposta, critica_resolucao),
+        "alta":    (alta_resposta, alta_resolucao),
+        "media":   (media_resposta, media_resolucao),
+        "baixa":   (baixa_resposta, baixa_resolucao),
+    }
+    for prioridade, (resposta, resolucao) in dados.items():
+        if resposta <= 0 or resolucao <= 0:
+            raise HTTPException(status_code=400, detail=f"Prazos devem ser maiores que zero para '{prioridade}'.")
+        if resolucao < resposta:
+            raise HTTPException(status_code=400, detail=f"Prazo de resolução não pode ser menor que o de resposta para '{prioridade}'.")
+        cfg = db.query(SLAConfig).filter(
+            SLAConfig.tenant_id == tenant.id,
+            SLAConfig.prioridade == prioridade,
+        ).first()
+        if cfg:
+            cfg.prazo_resposta_horas = resposta
+            cfg.prazo_resolucao_horas = resolucao
+        else:
+            db.add(SLAConfig(
+                tenant_id=tenant.id,
+                prioridade=prioridade,
+                prazo_resposta_horas=resposta,
+                prazo_resolucao_horas=resolucao,
+            ))
+    db.commit()
+    return RedirectResponse(url="/admin/sla?msg=salvo", status_code=303)
+
+
+@router.post("/sla/resetar")
+def admin_sla_resetar(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_admin),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    """Remove as configs customizadas — o sistema voltará a usar os padrões embutidos."""
+    db.query(SLAConfig).filter(SLAConfig.tenant_id == tenant.id).delete()
+    db.commit()
+    return RedirectResponse(url="/admin/sla?msg=resetado", status_code=303)

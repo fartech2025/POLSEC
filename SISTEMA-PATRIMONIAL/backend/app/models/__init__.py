@@ -11,3 +11,4 @@ from app.models.funcionario import Funcionario
 from app.models.chamado import Chamado, AnexoChamado
 from app.models.peca import Peca, EstoqueGeral, EstoqueFilial, PecaChamado
 from app.models.orcamento import Orcamento, AprovacaoOrcamento, NotaFiscal
+from app.models.sla import SLAConfig

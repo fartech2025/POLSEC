@@ -15,6 +15,7 @@ from app.models.funcionario import Funcionario
 from app.models.patrimonio import Patrimonio
 from app.models.usuario import PerfilUsuario, Usuario
 from app.services.auth_service import get_tenant_atual, get_usuario_logado
+from app.services.sla_service import calcular_sla_lote
 from app.models.tenant import Tenant
 
 router = APIRouter()
@@ -93,6 +94,9 @@ def painel_tecnico(
         "concluidos": _count(StatusChamado.concluido),
     }
 
+    # SLA — calcula status de cada chamado em lote (evita N+1)
+    sla_map = calcular_sla_lote(chamados, db)
+
     # Dados para o modal de novo chamado
     patrimonios = (
         db.query(Patrimonio)
@@ -116,6 +120,7 @@ def painel_tecnico(
             "funcionario": funcionario,
             "chamados": chamados,
             "stats": stats,
+            "sla_map": sla_map,
             "prioridade": prioridade,
             "status_filtro": status_filtro,
             "StatusChamado": StatusChamado,

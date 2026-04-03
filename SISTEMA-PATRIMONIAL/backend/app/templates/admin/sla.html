@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Configurações de SLA{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">
+      <i class="bi bi-stopwatch me-2 text-primary"></i>Configurações de SLA
+    </h4>
+    <small class="text-muted">Acordos de Nível de Serviço por prioridade — {{ tenant.nome }}</small>
+  </div>
+</div>
+
+{% if msg == 'salvo' %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-check-circle me-2"></i>Configurações salvas com sucesso.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif msg == 'resetado' %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+  <i class="bi bi-arrow-counterclockwise me-2"></i>SLAs redefinidos para os valores padrão do sistema.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Explicação rápida -->
+<div class="alert alert-light border mb-4">
+  <div class="row g-2 align-items-start">
+    <div class="col-auto">
+      <i class="bi bi-info-circle text-primary fs-5"></i>
+    </div>
+    <div class="col">
+      <strong>Como funciona o SLA?</strong><br>
+      <span class="text-muted small">
+        O <em>prazo de resposta</em> define em quantas horas um técnico deve iniciar o atendimento (mudar status para <em>Em Atendimento</em>).
+        O <em>prazo de resolução</em> é o tempo limite para concluir o chamado.
+        Os badges coloridos no painel técnico indicam: <span class="badge bg-success">Dentro do Prazo</span>
+        <span class="badge bg-warning text-dark">Em Risco (≥ 80 %)</span>
+        <span class="badge bg-danger">Violado (≥ 100 %)</span>.
+      </span>
+    </div>
+  </div>
+</div>
+
+<form method="POST" action="/admin/sla">
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom fw-semibold small">
+      <i class="bi bi-sliders me-2 text-primary"></i>Prazos por Prioridade (em horas)
+    </div>
+    <div class="card-body">
+
+      <!-- Cabeçalho da tabela -->
+      <div class="row fw-semibold small text-muted mb-2 d-none d-md-flex px-2">
+        <div class="col-3">Prioridade</div>
+        <div class="col-4">Prazo de Resposta (h)</div>
+        <div class="col-4">Prazo de Resolução (h)</div>
+        <div class="col-1"></div>
+      </div>
+
+      {% set icones = {'critica': '🔴', 'alta': '🟠', 'media': '🟡', 'baixa': '🟢'} %}
+      {% set labels = {'critica': 'Crítica', 'alta': 'Alta', 'media': 'Média', 'baixa': 'Baixa'} %}
+      {% set defaults_r = {'critica': 1, 'alta': 4, 'media': 8, 'baixa': 24} %}
+      {% set defaults_s = {'critica': 4, 'alta': 24, 'media': 48, 'baixa': 96} %}
+
+      {% for p in prioridades %}
+      {% set cfg = configs.get(p) %}
+      <div class="row g-2 align-items-center mb-3 px-2">
+        <div class="col-12 col-md-3">
+          <span class="fw-semibold">{{ icones[p] }} {{ labels[p] }}</span>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small d-md-none mb-1">Resposta (h)</label>
+          <div class="input-group input-group-sm">
+            <input type="number" name="{{ p }}_resposta" class="form-control"
+                   min="0.5" max="720" step="0.5" required
+                   value="{{ cfg.prazo_resposta_horas if cfg else defaults_r[p] }}">
+            <span class="input-group-text text-muted">h</span>
+          </div>
+        </div>
+        <div class="col-6 col-md-4">
+          <label class="form-label small d-md-none mb-1">Resolução (h)</label>
+          <div class="input-group input-group-sm">
+            <input type="number" name="{{ p }}_resolucao" class="form-control"
+                   min="0.5" max="8760" step="0.5" required
+                   value="{{ cfg.prazo_resolucao_horas if cfg else defaults_s[p] }}">
+            <span class="input-group-text text-muted">h</span>
+          </div>
+        </div>
+        {% if cfg %}
+        <div class="col-12 col-md-1 text-muted" style="font-size:.72rem;">
+          <i class="bi bi-pencil-fill" title="Customizado"></i>
+        </div>
+        {% else %}
+        <div class="col-12 col-md-1 text-muted" style="font-size:.72rem;" title="Usando padrão do sistema">
+          <i class="bi bi-gear"></i>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+    </div>
+    <div class="card-footer bg-white border-top d-flex justify-content-between align-items-center">
+      <form method="POST" action="/admin/sla/resetar" class="d-inline"
+            onsubmit="return confirm('Redefinir todos os SLAs para os valores padrão?')">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Redefinir padrões
+        </button>
+      </form>
+      <button type="submit" form="formSLA" class="btn btn-primary btn-sm">
+        <i class="bi bi-floppy me-1"></i>Salvar configurações
+      </button>
+    </div>
+  </div>
+</form>
+
+<!-- Hack: o form externo precisa de id para o botão submit funcionar fora dele -->
+<script>
+  document.querySelector('form[action="/admin/sla"]').id = 'formSLA';
+  document.querySelector('form[action="/admin/sla/resetar"]').id = 'formReset';
+</script>
+
+<!-- Tabela de referência -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom fw-semibold small">
+    <i class="bi bi-table me-2 text-secondary"></i>Referência — Padrões POLSEC
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle small mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Prioridade</th>
+          <th>Resposta padrão</th>
+          <th>Resolução padrão</th>
+          <th class="pe-3">Exemplo de uso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="ps-3"><span class="badge bg-danger">🔴 Crítica</span></td>
+          <td>1 hora</td>
+          <td>4 horas</td>
+          <td class="text-muted pe-3">Servidor fora do ar, sistema crítico inoperante</td>
+        </tr>
+        <tr>
+          <td class="ps-3"><span class="badge bg-warning text-dark">🟠 Alta</span></td>
+          <td>4 horas</td>
+          <td>24 horas</td>
+          <td class="text-muted pe-3">Equipamento de produção com falha parcial</td>
+        </tr>
+        <tr>
+          <td class="ps-3"><span class="badge bg-primary">🟡 Média</span></td>
+          <td>8 horas</td>
+          <td>48 horas</td>
+          <td class="text-muted pe-3">Impressora com defeito, lentidão no sistema</td>
+        </tr>
+        <tr>
+          <td class="ps-3"><span class="badge bg-success">🟢 Baixa</span></td>
+          <td>24 horas</td>
+          <td>96 horas</td>
+          <td class="text-muted pe-3">Ajuste cosmético, solicitação de melhoria</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

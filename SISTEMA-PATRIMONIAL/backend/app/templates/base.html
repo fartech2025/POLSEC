@@ -61,6 +61,12 @@
         <span class="sidebar-section-label">Sistema</span>
       </li>
       <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/sla') %}active{% endif %}"
+           href="/admin/sla">
+          <i class="bi bi-stopwatch me-2"></i><span>SLA</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {% if request.url.path.startswith('/admin/usuarios') %}active{% endif %}"
            href="/admin/usuarios">
           <i class="bi bi-person-lock me-2"></i><span>Acessos</span>

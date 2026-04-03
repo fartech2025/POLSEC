@@ -139,6 +139,7 @@
             <th>Patrimônio</th>
             <th>Prioridade</th>
             <th>Status</th>
+            <th>SLA</th>
             <th>Abertura</th>
             <th class="pe-3">Ação</th>
           </tr>
@@ -177,6 +178,48 @@
                 {% elif c.status.value == 'cancelado' %}Cancelado
                 {% else %}{{ c.status.value }}{% endif %}
               </span>
+            </td>
+            <td>
+              {% if sla_map and c.id in sla_map %}
+                {% set sla = sla_map[c.id] %}
+                <span class="badge bg-{{ sla.cor }} px-2 py-1"
+                      style="font-size:.7rem;white-space:nowrap;"
+                      title="{{ sla.prazo_resolucao_horas }}h de prazo">
+                  {{ sla.label }}
+                </span>
+                {% if sla.status not in ('concluido_ok', 'concluido_violado', 'sem_sla') %}
+                <div class="text-muted mt-1" style="font-size:.68rem;">
+                  {% if sla.horas_restantes > 0 %}
+                    {{ '%g' | format(sla.horas_restantes | round(1)) }}h restantes
+                  {% else %}
+                    {{ '%g' | format((sla.horas_restantes * -1) | round(1)) }}h em atraso
+                  {% endif %}
+                </div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sla_map and c.id in sla_map %}
+                {% set sla = sla_map[c.id] %}
+                <span class="badge bg-{{ sla.cor }} px-2 py-1"
+                      style="font-size:.7rem;white-space:nowrap;"
+                      title="Prazo: {{ sla.prazo_resolucao_horas }}h">
+                  {{ sla.label }}
+                </span>
+                {% if sla.status not in ('concluido_ok', 'concluido_violado', 'sem_sla') %}
+                <div class="text-muted mt-1" style="font-size:.68rem;">
+                  {% if sla.horas_restantes > 0 %}
+                    {{ sla.horas_restantes | round(1) }}h restantes
+                  {% else %}
+                    {{ (sla.horas_restantes * -1) | round(1) }}h em atraso
+                  {% endif %}
+                </div>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
             </td>
             <td class="text-muted" style="font-size:.78rem;">
               {{ c.data_abertura.strftime('%d/%m/%Y %H:%M') if c.data_abertura else '—' }}
