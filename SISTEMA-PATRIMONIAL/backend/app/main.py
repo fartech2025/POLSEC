@@ -9,6 +9,7 @@ from app.database import Base, engine
 from app.middleware.tenant import TenantMiddleware
 from app.routers import auth, patrimonio, movimentacao, dashboard, assistente, da
 from app.routers import tenant
+from app.routers import cargo, filial, funcionario, chamado, peca, orcamento
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,14 @@ app.include_router(movimentacao.router, prefix="/movimentacao", tags=["Movimenta
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(assistente.router, prefix="/assistente", tags=["Assistente IA"])
 app.include_router(da.router, prefix="/da", tags=["Data Analytics"])
+
+# ── Módulos FARTECH ───────────────────────────────────────────────────────────
+app.include_router(cargo.router, prefix="/cargos", tags=["Cargos"])
+app.include_router(filial.router, prefix="/filiais", tags=["Filiais"])
+app.include_router(funcionario.router, prefix="/funcionarios", tags=["Funcionários"])
+app.include_router(chamado.router, prefix="/chamados", tags=["Chamados"])
+app.include_router(peca.router, prefix="/pecas", tags=["Peças & Estoque"])
+app.include_router(orcamento.router, prefix="/orcamentos", tags=["Orçamentos"])
 
 
 @app.get("/")
