@@ -93,6 +93,20 @@ def painel_tecnico(
         "concluidos": _count(StatusChamado.concluido),
     }
 
+    # Dados para o modal de novo chamado
+    patrimonios = (
+        db.query(Patrimonio)
+        .filter(Patrimonio.tenant_id == tenant.id)
+        .order_by(Patrimonio.codigo)
+        .all()
+    )
+    todos_funcionarios = (
+        db.query(Funcionario)
+        .filter(Funcionario.tenant_id == tenant.id, Funcionario.ativo == True)
+        .order_by(Funcionario.nome)
+        .all()
+    )
+
     return templates.TemplateResponse(
         "tecnico/painel.html",
         {
@@ -105,6 +119,9 @@ def painel_tecnico(
             "prioridade": prioridade,
             "status_filtro": status_filtro,
             "StatusChamado": StatusChamado,
+            "PrioridadeChamado": PrioridadeChamado,
+            "patrimonios": patrimonios,
+            "todos_funcionarios": todos_funcionarios,
         },
     )
 

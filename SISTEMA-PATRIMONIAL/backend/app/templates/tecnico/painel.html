@@ -23,9 +23,9 @@
   </div>
   <div class="d-flex align-items-center gap-2">
     <span class="text-muted small">{{ tenant.nome }}</span>
-    <a href="/tecnico/chamado/novo" class="btn btn-primary btn-sm">
+    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNovoChamado">
       <i class="bi bi-plus-circle me-1"></i>Novo Chamado
-    </a>
+    </button>
   </div>
 </div>
 
@@ -201,4 +201,118 @@
     {% endif %}
   </div>
 </div>
+
+<!-- ── Modal: Novo Chamado ──────────────────────────────────────────────── -->
+<div class="modal fade" id="modalNovoChamado" tabindex="-1" aria-labelledby="modalNovoChamadoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+
+      <div class="modal-header" style="background:linear-gradient(90deg,#001a2e,#003366);border-bottom:1px solid #1a3a5a;">
+        <h5 class="modal-title fw-bold text-white" id="modalNovoChamadoLabel">
+          <i class="bi bi-plus-circle me-2" style="color:#4da6ff;"></i>Novo Chamado
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="/tecnico/chamado/novo" id="formNovoChamado">
+        <div class="modal-body p-4">
+
+          {% if not patrimonios %}
+          <div class="alert alert-warning mb-0">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Nenhum patrimônio cadastrado. <a href="/patrimonio/novo" class="alert-link">Cadastre um bem</a> antes de abrir um chamado.
+          </div>
+          {% else %}
+
+          <!-- Título -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Título <span class="text-danger">*</span></label>
+            <input type="text" name="titulo" class="form-control" required maxlength="200"
+                   placeholder="Ex: Computador sem ligar — Recepção">
+          </div>
+
+          <!-- Descrição -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Descrição detalhada <span class="text-danger">*</span></label>
+            <textarea name="descricao" class="form-control" rows="3" required
+                      placeholder="Descreva o problema, quando ocorreu e o impacto..."></textarea>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <!-- Patrimônio -->
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Equipamento / Patrimônio <span class="text-danger">*</span></label>
+              <select name="patrimonio_id" class="form-select" required>
+                <option value="">— Selecione o bem —</option>
+                {% for p in patrimonios %}
+                <option value="{{ p.id }}">
+                  {{ p.codigo }} — {{ p.descricao }}{% if p.localizacao %} ({{ p.localizacao }}){% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Prioridade -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Prioridade <span class="text-danger">*</span></label>
+              <select name="prioridade" class="form-select" required>
+                <option value="baixa">🟢 Baixa</option>
+                <option value="media" selected>🟡 Média</option>
+                <option value="alta">🟠 Alta</option>
+                <option value="critica">🔴 Crítica</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <!-- Solicitante -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Solicitante <span class="text-danger">*</span></label>
+              <select name="solicitante_id" class="form-select" required>
+                <option value="">— Selecione —</option>
+                {% for f in todos_funcionarios %}
+                <option value="{{ f.id }}"
+                  {% if funcionario and f.id == funcionario.id %}selected{% endif %}>
+                  {{ f.nome }}{% if f.cargo %} · {{ f.cargo.nome }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Técnico -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Técnico responsável</label>
+              <select name="tecnico_id" class="form-select">
+                <option value="0">— A definir —</option>
+                {% for f in todos_funcionarios %}
+                <option value="{{ f.id }}"
+                  {% if funcionario and f.id == funcionario.id %}selected{% endif %}>
+                  {{ f.nome }}{% if f.cargo %} · {{ f.cargo.nome }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Pode ser atribuído depois pelo administrador.</div>
+            </div>
+          </div>
+
+          {% endif %}
+
+        </div><!-- /modal-body -->
+
+        <div class="modal-footer" style="border-top:1px solid #e9ecef;">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+          </button>
+          {% if patrimonios %}
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle me-1"></i>Registrar Chamado
+          </button>
+          {% endif %}
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
 {% endblock %}
