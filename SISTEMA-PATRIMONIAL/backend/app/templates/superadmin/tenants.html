@@ -1,0 +1,69 @@
+{% extends "base_superadmin.html" %}
+{% block title %}Empresas{% endblock %}
+{% block page_title %}Empresas Cadastradas{% endblock %}
+
+{% block content %}
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-3">
+    <span class="fw-bold">{{ tenants | length }} empresa(s)</span>
+    <a href="/empresa/registrar" class="btn btn-sm btn-brand">
+      <i class="bi bi-plus-lg me-1"></i>Nova empresa
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" style="font-size:.875rem;">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Empresa</th>
+            <th>Slug</th>
+            <th>E-mail admin</th>
+            <th>Plano</th>
+            <th>Usuários</th>
+            <th>Status</th>
+            <th>Cadastro</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tenants %}
+          <tr>
+            <td class="ps-4 fw-semibold">{{ t.nome }}</td>
+            <td><code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;">{{ t.slug }}</code></td>
+            <td class="text-muted">{{ t.email_admin }}</td>
+            <td>
+              <span class="badge"
+                style="background:{% if t.plano == 'profissional' %}#fff3ee;color:#ff4e17{% elif t.plano == 'enterprise' %}#f0f7ff;color:#3b82f6{% else %}#f5f5f5;color:#666{% endif %};">
+                {{ t.plano }}
+              </span>
+            </td>
+            <td>{{ usuarios_map.get(t.id, 0) }}</td>
+            <td>
+              {% if t.ativo %}
+                <span class="badge" style="background:#f0fff4;color:#16a34a;">Ativa</span>
+              {% else %}
+                <span class="badge" style="background:#fef2f2;color:#dc2626;">Inativa</span>
+              {% endif %}
+            </td>
+            <td class="text-muted" style="font-size:.8rem;">{{ t.created_at.strftime('%d/%m/%Y') }}</td>
+            <td>
+              <form method="POST" action="/superadmin/tenants/{{ t.id }}/toggle"
+                    onsubmit="return confirm('Confirmar alteração de status?')">
+                <button type="submit" class="btn btn-sm"
+                  style="border:1px solid {% if t.ativo %}#dc2626{% else %}#22c55e{% endif %};
+                         color:{% if t.ativo %}#dc2626{% else %}#22c55e{% endif %};
+                         font-size:.75rem;padding:2px 10px;">
+                  {{ 'Desativar' if t.ativo else 'Ativar' }}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

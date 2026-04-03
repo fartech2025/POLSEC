@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Plataforma{% endblock %} — FARTECH Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link href="/static/css/style.css" rel="stylesheet"/>
+  <style>
+    /* ── SuperAdmin skin — preto + laranja FARTECH ── */
+    #sa-sidebar {
+      width: 240px;
+      min-height: 100vh;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: linear-gradient(180deg, #0a0a0a 0%, #1a0800 100%);
+      border-right: 1px solid #ff4e1730;
+    }
+    .sa-brand-logo { max-width: 130px; }
+    .sa-badge {
+      font-size: .6rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      background: #ff4e17;
+      color: #000;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 700;
+    }
+    #sa-sidebar .nav-link {
+      color: #aaa;
+      border-radius: .4rem;
+      font-size: .875rem;
+      padding: .45rem .75rem;
+      transition: background .15s, color .15s;
+    }
+    #sa-sidebar .nav-link:hover   { background: #ff4e1715; color: #fff; }
+    #sa-sidebar .nav-link.active  { background: #ff4e17;   color: #000; font-weight: 600; }
+    #sa-sidebar .section-label {
+      font-size: .6rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #ff4e1770;
+      padding: .5rem .75rem 0;
+    }
+    #sa-content { background: #f8f8f8; min-height: 100vh; }
+    .sa-topbar {
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      padding: .6rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sa-topbar .page-title { font-weight: 700; font-size: 1.1rem; color: #111; }
+    .sa-user-chip {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .8rem;
+      color: #555;
+    }
+    .sa-avatar {
+      width: 32px; height: 32px;
+      background: #ff4e17;
+      color: #000;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .85rem;
+    }
+    .sa-stat-card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: .75rem;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .sa-stat-card .stat-icon {
+      width: 48px; height: 48px;
+      border-radius: .5rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+    }
+    .sa-stat-card .stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .sa-stat-card .stat-label { font-size: .78rem; color: #888; margin-top: .25rem; }
+  </style>
+</head>
+<body>
+<div class="d-flex" id="wrapper">
+
+  <!-- Sidebar SuperAdmin -->
+  <nav id="sa-sidebar" class="p-3 d-flex flex-column">
+    <div class="mb-4 text-center pt-2">
+      <img src="https://nolchmlmkebfuiamxvml.supabase.co/storage/v1/object/public/POLSEC%20IMAGES/PNG/POLSEC_MARCA_Artboard%201%20copy%2012.png"
+           alt="POLSEC" class="sa-brand-logo mb-2"/>
+      <div class="mt-1">
+        <span class="sa-badge">FARTECH Admin</span>
+      </div>
+    </div>
+
+    <ul class="nav flex-column gap-1 flex-grow-1">
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path == '/superadmin' or request.url.path == '/superadmin/' %}active{% endif %}"
+           href="/superadmin">
+          <i class="bi bi-grid-1x2 me-2"></i>Visão Geral
+        </a>
+      </li>
+
+      <li class="section-label mt-2">Gestão de Plataforma</li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/superadmin/tenants') %}active{% endif %}"
+           href="/superadmin/tenants">
+          <i class="bi bi-buildings me-2"></i>Empresas (Tenants)
+        </a>
+      </li>
+
+      <li class="section-label mt-2">Sistema</li>
+      <li class="nav-item">
+        <a class="nav-link" href="/docs" target="_blank">
+          <i class="bi bi-code-square me-2"></i>API Docs
+        </a>
+      </li>
+    </ul>
+
+    <!-- Rodapé -->
+    <div class="mt-auto pt-3" style="border-top:1px solid #ff4e1720;">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <div class="sa-avatar">{{ usuario.nome[0] | upper }}</div>
+        <div>
+          <div style="font-size:.78rem;color:#ccc;font-weight:600;">{{ usuario.nome }}</div>
+          <div style="font-size:.65rem;color:#ff4e17;">FARTECH • superadmin</div>
+        </div>
+      </div>
+      <a href="/auth/logout" class="btn btn-sm w-100"
+         style="border:1px solid #ff4e1750;color:#ff4e17;font-size:.75rem;">
+        <i class="bi bi-box-arrow-right me-1"></i> Sair
+      </a>
+    </div>
+  </nav>
+
+  <!-- Conteúdo -->
+  <div id="sa-content" class="flex-grow-1">
+    <!-- Top bar -->
+    <div class="sa-topbar">
+      <span class="page-title">{% block page_title %}Plataforma{% endblock %}</span>
+      <div class="sa-user-chip">
+        <i class="bi bi-circle-fill text-success" style="font-size:.5rem;"></i>
+        Sistema online
+      </div>
+    </div>
+
+    <!-- Conteúdo da página -->
+    <div class="p-4">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

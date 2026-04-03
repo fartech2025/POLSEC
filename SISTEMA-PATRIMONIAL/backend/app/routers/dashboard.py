@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -7,6 +7,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.patrimonio import Patrimonio, StatusPatrimonio
 from app.models.tenant import Tenant
+from app.models.usuario import PerfilUsuario
 from app.services.auth_service import get_tenant_atual, get_usuario_logado
 
 router = APIRouter()
@@ -20,6 +21,8 @@ def dashboard(
     usuario=Depends(get_usuario_logado),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
+    if usuario.perfil == PerfilUsuario.superadmin:
+        return RedirectResponse(url="/superadmin", status_code=302)
     total = (
         db.query(func.count(Patrimonio.id))
         .filter(Patrimonio.tenant_id == tenant.id)
