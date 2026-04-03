@@ -16,6 +16,9 @@ Compressão de fotos:
 import io
 import logging
 import mimetypes
+import os
+import re
+import uuid
 from typing import BinaryIO
 
 from PIL import Image
@@ -42,15 +45,20 @@ def comprimir_imagem(dados: bytes) -> tuple[bytes, str]:
     Recebe bytes de uma imagem, retorna (bytes_comprimidos, mime_type).
     Converte para WebP, max 1920px, quality 75.
     """
-    with Image.open(io.BytesIO(dados)) as img:
+    img = Image.open(io.BytesIO(dados))
+    try:
         # Converte para RGB para garantir compatibilidade WebP
         if img.mode not in ("RGB", "RGBA"):
-            img = img.convert("RGB")
+            converted = img.convert("RGB")
+            img.close()
+            img = converted
         # Redimensiona mantendo proporção
         img.thumbnail((_MAX_PIXELS, _MAX_PIXELS), Image.LANCZOS)
         output = io.BytesIO()
         img.save(output, format="WEBP", quality=_WEBP_QUALITY, optimize=True)
         return output.getvalue(), "image/webp"
+    finally:
+        img.close()
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
@@ -99,20 +107,44 @@ def remover_arquivo(bucket_path: str) -> None:
 
 # ── Helpers de caminho ────────────────────────────────────────────────────────
 
+_FILENAME_SAFE = re.compile(r"[^\w.\-]")
+
+
+def sanitizar_filename(nome: str) -> str:
+    """
+    Remove path traversal e caracteres inseguros do nome de arquivo.
+    Substitui qualquer char não-alfanumérico (exceto ponto e hífen) por '_'.
+    Qualquer '/' ou '\' é interpretado pelo bucket como subpasta — removemos.
+    OWASP A03: previne path traversal no storage.
+    """
+    # Remove componentes de diretório (ex: ../../secret.pdf → secret.pdf)
+    nome = os.path.basename(nome.replace("\\", "/"))
+    # Substitui chars perigosos por underscore
+    nome = _FILENAME_SAFE.sub("_", nome)
+    # Garante que não fique vazio
+    if not nome or nome in (".", ".."):
+        nome = "arquivo"
+    return nome
+
+
 def montar_path_foto(tenant_slug: str, chamado_id: int, filename: str) -> str:
-    return f"{tenant_slug}/chamados/{chamado_id}/fotos/{filename}"
+    return f"{tenant_slug}/chamados/{chamado_id}/fotos/{sanitizar_filename(filename)}"
 
 
 def montar_path_orcamento(tenant_slug: str, chamado_id: int, filename: str) -> str:
-    return f"{tenant_slug}/chamados/{chamado_id}/orcamentos/{filename}"
+    return f"{tenant_slug}/chamados/{chamado_id}/orcamentos/{sanitizar_filename(filename)}"
 
 
 def montar_path_nota_fiscal(tenant_slug: str, chamado_id: int, filename: str) -> str:
-    return f"{tenant_slug}/chamados/{chamado_id}/notas_fiscais/{filename}"
+    return f"{tenant_slug}/chamados/{chamado_id}/notas_fiscais/{sanitizar_filename(filename)}"
 
 
 def montar_path_laudo(tenant_slug: str, chamado_id: int, filename: str) -> str:
-    return f"{tenant_slug}/chamados/{chamado_id}/laudos/{filename}"
+    return f"{tenant_slug}/chamados/{chamado_id}/laudos/{sanitizar_filename(filename)}"
+
+
+def montar_path_outro(tenant_slug: str, chamado_id: int, filename: str) -> str:
+    return f"{tenant_slug}/chamados/{chamado_id}/outros/{sanitizar_filename(filename)}"
 
 
 # ── Função principal de processamento ────────────────────────────────────────

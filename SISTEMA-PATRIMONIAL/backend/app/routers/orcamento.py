@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
 from app.database import get_db
 from app.models.orcamento import (
     Orcamento, AprovacaoOrcamento, NotaFiscal, StatusOrcamento
@@ -141,6 +143,8 @@ def submeter_para_aprovacao(
     """Move de 'rascunho' para 'aguardando_aprovacao'."""
     orc = _buscar_ou_404(db, orcamento_id, tenant.id)
     _transicionar_orcamento(db, orc, StatusOrcamento.aguardando_aprovacao, dados)
+    db.commit()
+    db.refresh(orc)
     return orc
 
 
@@ -155,6 +159,7 @@ def aprovar_orcamento(
     """Aprova o orçamento (requer estar em 'aguardando_aprovacao')."""
     orc = _buscar_ou_404(db, orcamento_id, tenant.id)
     _transicionar_orcamento(db, orc, StatusOrcamento.aprovado, dados)
+    # Atualiza aprovado_por e data_aprovacao na mesma transação (atômico)
     orc.aprovado_por_id = dados.ator_id
     orc.data_aprovacao = datetime.utcnow()
     db.commit()
@@ -178,6 +183,8 @@ def rejeitar_orcamento(
         )
     orc = _buscar_ou_404(db, orcamento_id, tenant.id)
     _transicionar_orcamento(db, orc, StatusOrcamento.rejeitado, dados)
+    db.commit()
+    db.refresh(orc)
     return orc
 
 
@@ -191,6 +198,8 @@ def cancelar_orcamento(
 ):
     orc = _buscar_ou_404(db, orcamento_id, tenant.id)
     _transicionar_orcamento(db, orc, StatusOrcamento.cancelado, dados)
+    db.commit()
+    db.refresh(orc)
     return orc
 
 
@@ -222,7 +231,9 @@ async def anexar_pdf_orcamento(
     _usuario=Depends(get_usuario_logado),
 ):
     orc = _buscar_ou_404(db, orcamento_id, tenant.id)
-    dados = await arquivo.read()
+    dados = await arquivo.read(_MAX_UPLOAD_BYTES + 1)
+    if len(dados) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Arquivo excede o limite de 10 MB.")
     path = storage_service.montar_path_orcamento(tenant.slug, orc.chamado_id, arquivo.filename)
     bucket_path, _, _ = storage_service.processar_e_enviar_documento(dados, path)
     orc.bucket_path = bucket_path
@@ -248,7 +259,9 @@ async def registrar_nota_fiscal(
     _usuario=Depends(get_usuario_logado),
 ):
     orc = _buscar_ou_404(db, orcamento_id, tenant.id)
-    dados = await arquivo.read()
+    dados = await arquivo.read(_MAX_UPLOAD_BYTES + 1)
+    if len(dados) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Arquivo excede o limite de 10 MB.")
     path = storage_service.montar_path_nota_fiscal(tenant.slug, orc.chamado_id, arquivo.filename)
     bucket_path, mime_type, tamanho_kb = storage_service.processar_e_enviar_documento(dados, path)
     url = storage_service.gerar_url_publica(bucket_path)
@@ -309,8 +322,7 @@ def _transicionar_orcamento(
         )
     _registrar_historico(db, orc, orc.status, novo_status, dados.ator_id, dados.justificativa)
     orc.status = novo_status
-    db.commit()
-    db.refresh(orc)
+    # NÃO commita aqui — responsabilidade do caller para garantir atomicidade.
 
 
 def _registrar_historico(

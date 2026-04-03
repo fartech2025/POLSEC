@@ -1,8 +1,9 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models.cargo import Cargo
@@ -15,7 +16,7 @@ router = APIRouter()
 
 class CargoIn(BaseModel):
     nome: str
-    nivel_hierarquico: int
+    nivel_hierarquico: int = Field(..., ge=1, le=7, description="1=Diretor ... 7=Auxiliar")
     descricao: Optional[str] = None
     permissoes: dict = {}
     ativo: bool = True
@@ -104,5 +105,12 @@ def remover_cargo(
     cargo = db.query(Cargo).filter(Cargo.id == cargo_id, Cargo.tenant_id == tenant.id).first()
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado.")
-    db.delete(cargo)
-    db.commit()
+    try:
+        db.delete(cargo)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Não é possível remover: existem funcionários vinculados a este cargo.",
+        )

@@ -137,6 +137,8 @@ def transicionar_chamado(
         tecnico = db.query(Funcionario).filter(
             Funcionario.id == dados.tecnico_id, Funcionario.tenant_id == tenant.id
         ).first()
+        if not tecnico:
+            raise HTTPException(status_code=404, detail="Técnico não encontrado neste tenant.")
     return svc.transicionar(chamado, dados.novo_status, tecnico=tecnico)
 
 
@@ -168,7 +170,10 @@ def listar_anexos(
     _usuario=Depends(get_usuario_logado),
 ):
     ChamadoService(db).buscar_ou_404(chamado_id, tenant.id)
-    return db.query(AnexoChamado).filter(AnexoChamado.chamado_id == chamado_id).all()
+    return db.query(AnexoChamado).filter(
+        AnexoChamado.chamado_id == chamado_id,
+        AnexoChamado.tenant_id == tenant.id,
+    ).all()
 
 
 @router.post("/{chamado_id}/anexos", response_model=AnexoOut, status_code=status.HTTP_201_CREATED)
@@ -184,10 +189,16 @@ async def enviar_anexo(
     Faz upload de arquivo para o chamado.
     Fotos são automaticamente comprimidas (WebP, max 1920px).
     Documentos (PDF, XML) são enviados sem alteração.
+    Limite: 10 MB por arquivo.
     """
+    _MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
     ChamadoService(db).buscar_ou_404(chamado_id, tenant.id)
-    dados = await arquivo.read()
-    mime = arquivo.content_type or "application/octet-stream"
+    dados = await arquivo.read(_MAX_UPLOAD_BYTES + 1)
+    if len(dados) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Arquivo excede o limite de 10 MB.",
+        )
 
     if tipo == TipoAnexo.foto:
         nome_base = arquivo.filename.rsplit(".", 1)[0]
@@ -195,13 +206,17 @@ async def enviar_anexo(
             dados, tenant.slug, chamado_id, nome_base
         )
     else:
-        bucket_path = storage_service.montar_path_nota_fiscal(tenant.slug, chamado_id, arquivo.filename)
-        if tipo == TipoAnexo.orcamento_pdf:
-            bucket_path = storage_service.montar_path_orcamento(tenant.slug, chamado_id, arquivo.filename)
-        elif tipo == TipoAnexo.laudo:
-            bucket_path = storage_service.montar_path_laudo(tenant.slug, chamado_id, arquivo.filename)
+        # Mapeia tipo para subpasta correta no bucket
+        _path_builders = {
+            TipoAnexo.orcamento_pdf: storage_service.montar_path_orcamento,
+            TipoAnexo.nota_fiscal:   storage_service.montar_path_nota_fiscal,
+            TipoAnexo.laudo:         storage_service.montar_path_laudo,
+            TipoAnexo.outro:         storage_service.montar_path_outro,
+        }
+        builder = _path_builders.get(tipo, storage_service.montar_path_outro)
+        bucket_path_raw = builder(tenant.slug, chamado_id, arquivo.filename)
         bucket_path, mime_final, tamanho_kb = storage_service.processar_e_enviar_documento(
-            dados, bucket_path
+            dados, bucket_path_raw
         )
 
     url = storage_service.gerar_url_publica(bucket_path)

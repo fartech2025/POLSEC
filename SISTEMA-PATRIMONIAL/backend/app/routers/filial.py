@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db
 from app.models.filial import Filial
@@ -107,5 +108,12 @@ def remover_filial(
     filial = db.query(Filial).filter(Filial.id == filial_id, Filial.tenant_id == tenant.id).first()
     if not filial:
         raise HTTPException(status_code=404, detail="Filial não encontrada.")
-    db.delete(filial)
-    db.commit()
+    try:
+        db.delete(filial)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Não é possível remover: existem funcionários ou estoques vinculados a esta filial.",
+        )
