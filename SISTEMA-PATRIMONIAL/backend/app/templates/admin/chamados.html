@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Chamados — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-headset me-2 text-primary"></i>Gestão de Chamados
+  </h4>
+  <span class="text-muted small">{{ tenant.nome }}</span>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-secondary">{{ stats.total }}</div>
+        <div class="text-muted small">Total</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:#0078d7;">{{ stats.abertos }}</div>
+        <div class="text-muted small">Abertos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:#6f42c1;">{{ stats.em_atendimento }}</div>
+        <div class="text-muted small">Em Atendimento</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-warning">{{ stats.aguardando }}</div>
+        <div class="text-muted small">Aguardando</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-success">{{ stats.concluidos }}</div>
+        <div class="text-muted small">Concluídos</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-2">
+    <form method="GET" action="/admin/chamados" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Status</label>
+        <select name="status_filtro" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="aberto"               {% if status_filtro=='aberto'               %}selected{% endif %}>Aberto</option>
+          <option value="em_atendimento"        {% if status_filtro=='em_atendimento'        %}selected{% endif %}>Em Atendimento</option>
+          <option value="aguardando_peca"       {% if status_filtro=='aguardando_peca'       %}selected{% endif %}>Ag. Peça</option>
+          <option value="aguardando_aprovacao"  {% if status_filtro=='aguardando_aprovacao'  %}selected{% endif %}>Ag. Aprovação</option>
+          <option value="concluido"             {% if status_filtro=='concluido'             %}selected{% endif %}>Concluído</option>
+          <option value="cancelado"             {% if status_filtro=='cancelado'             %}selected{% endif %}>Cancelado</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Prioridade</label>
+        <select name="prioridade" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          <option value="critica" {% if prioridade=='critica' %}selected{% endif %}>🔴 Crítica</option>
+          <option value="alta"    {% if prioridade=='alta'    %}selected{% endif %}>🟠 Alta</option>
+          <option value="media"   {% if prioridade=='media'   %}selected{% endif %}>🟡 Média</option>
+          <option value="baixa"   {% if prioridade=='baixa'   %}selected{% endif %}>🟢 Baixa</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Técnico</label>
+        <select name="tecnico_id" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          {% for t in tecnicos %}
+            <option value="{{ t.id }}" {% if tecnico_id == t.id|string %}selected{% endif %}>
+              {{ t.nome }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Filtrar
+        </button>
+      </div>
+      {% if status_filtro or prioridade or tecnico_id %}
+      <div class="col-md-1">
+        <a href="/admin/chamados" class="btn btn-outline-secondary btn-sm w-100">✕</a>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+    <span class="fw-semibold small">
+      <i class="bi bi-list-ul me-2 text-primary"></i>Chamados
+    </span>
+    <span class="badge bg-secondary">{{ chamados | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if chamados %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Nº</th>
+            <th>Título / Patrimônio</th>
+            <th>Solicitante</th>
+            <th>Prioridade</th>
+            <th>Status</th>
+            <th>Técnico</th>
+            <th>Abertura</th>
+            <th class="pe-3">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in chamados %}
+          <tr>
+            <td class="ps-3 fw-bold text-muted">#{{ c.id }}</td>
+            <td>
+              <div class="fw-semibold">{{ c.titulo }}</div>
+              {% if c.patrimonio %}
+                <div class="text-muted" style="font-size:.75rem;">
+                  <i class="bi bi-box-seam me-1"></i>{{ c.patrimonio.codigo }} — {{ c.patrimonio.descricao | truncate(25) }}
+                </div>
+              {% endif %}
+            </td>
+            <td class="text-muted">{{ c.solicitante.nome if c.solicitante else '—' }}</td>
+            <td>
+              {% set pc = c.prioridade.value %}
+              <span class="badge px-2 py-1
+                {% if pc == 'critica' %}bg-danger
+                {% elif pc == 'alta' %}bg-warning text-dark
+                {% elif pc == 'media' %}bg-warning text-dark
+                {% else %}bg-success{% endif %}">
+                {{ pc | capitalize }}
+              </span>
+            </td>
+            <td>
+              {% set sc = c.status.value %}
+              <span class="badge px-2 py-1
+                {% if sc == 'aberto' %}text-white{% elif sc == 'concluido' %}bg-success
+                {% elif sc == 'cancelado' %}bg-secondary{% else %}text-white{% endif %}"
+                style="{% if sc == 'aberto' %}background:#0078d7;
+                       {% elif sc == 'em_atendimento' %}background:#6f42c1;
+                       {% elif sc == 'aguardando_peca' or sc == 'aguardando_aprovacao' %}background:#fd7e14;
+                       {% endif %}font-size:.72rem;white-space:nowrap;">
+                {% if sc == 'aberto' %}Aberto
+                {% elif sc == 'em_atendimento' %}Em Atendimento
+                {% elif sc == 'aguardando_peca' %}Ag. Peça
+                {% elif sc == 'aguardando_aprovacao' %}Ag. Aprovação
+                {% elif sc == 'concluido' %}Concluído
+                {% elif sc == 'cancelado' %}Cancelado
+                {% else %}{{ sc }}{% endif %}
+              </span>
+            </td>
+            <td>
+              {% if c.tecnico %}
+                <span class="text-success"><i class="bi bi-person-check me-1"></i>{{ c.tecnico.nome }}</span>
+              {% else %}
+                <!-- Form atribuição inline -->
+                <form method="POST" action="/admin/chamados/{{ c.id }}/atribuir" class="d-flex gap-1">
+                  <select name="tecnico_id" class="form-select form-select-sm" style="width:130px;font-size:.75rem;" required>
+                    <option value="">Atribuir...</option>
+                    {% for t in tecnicos %}
+                      <option value="{{ t.id }}">{{ t.nome }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:2px 6px;">
+                    <i class="bi bi-check2"></i>
+                  </button>
+                </form>
+              {% endif %}
+            </td>
+            <td class="text-muted" style="font-size:.78rem;">
+              {{ c.data_abertura.strftime('%d/%m/%y %H:%M') if c.data_abertura else '—' }}
+            </td>
+            <td class="pe-3">
+              {% if c.status.value not in ['concluido', 'cancelado'] %}
+              <form method="POST" action="/admin/chamados/{{ c.id }}/fechar"
+                    onsubmit="return confirm('Cancelar chamado #{{ c.id }}?')" class="d-inline">
+                <button class="btn btn-outline-danger btn-sm" title="Cancelar chamado">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+              </form>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-inbox fs-1 d-block mb-2" style="opacity:.3;"></i>
+      <div>Nenhum chamado encontrado
+        {% if status_filtro or prioridade or tecnico_id %}com os filtros aplicados{% endif %}.
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

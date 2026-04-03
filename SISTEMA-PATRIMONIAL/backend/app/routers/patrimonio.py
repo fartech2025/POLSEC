@@ -8,12 +8,23 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.patrimonio import StatusPatrimonio
 from app.models.tenant import Tenant
+from app.models.usuario import PerfilUsuario
 from app.schemas.patrimonio import PatrimonioCreate, PatrimonioUpdate
 from app.services.auth_service import get_tenant_atual, get_usuario_logado
 from app.services.patrimonio_service import PatrimonioService
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+def _exigir_escrita(usuario=Depends(get_usuario_logado)):
+    """Bloqueia visualizador em endpoints de escrita."""
+    if usuario.perfil == PerfilUsuario.visualizador:
+        raise HTTPException(
+            status_code=403,
+            detail="Visualizadores não podem criar ou editar patrimônios.",
+        )
+    return usuario
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -49,7 +60,7 @@ def listar(
 def form_novo(
     request: Request,
     db: Session = Depends(get_db),
-    usuario=Depends(get_usuario_logado),
+    usuario=Depends(_exigir_escrita),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
     service = PatrimonioService(db, tenant.id)
@@ -78,7 +89,7 @@ def criar(
     valor: Optional[str] = Form(None),
     observacoes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    usuario=Depends(get_usuario_logado),
+    usuario=Depends(_exigir_escrita),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
     service = PatrimonioService(db, tenant.id)
@@ -126,7 +137,7 @@ def form_editar(
     patrimonio_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    usuario=Depends(get_usuario_logado),
+    usuario=Depends(_exigir_escrita),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
     service = PatrimonioService(db, tenant.id)

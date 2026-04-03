@@ -4,9 +4,11 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h4 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2 text-primary"></i>Patrimônios</h4>
+  {% if usuario.perfil.value != 'visualizador' %}
   <a href="/patrimonio/novo" class="btn btn-primary">
     <i class="bi bi-plus-lg me-1"></i> Novo Bem
   </a>
+  {% endif %}
 </div>
 
 <!-- Filtros -->

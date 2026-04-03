@@ -116,6 +116,12 @@
           <i class="bi bi-box-seam me-2"></i><span>Patrimônios</span>
         </a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/movimentacao') %}active{% endif %}"
+           href="/movimentacao">
+          <i class="bi bi-arrow-left-right me-2"></i><span>Movimentações</span>
+        </a>
+      </li>
 
       <li class="nav-item mt-3 mb-1">
         <span class="tecnico-section">Ferramentas</span>

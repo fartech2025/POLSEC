@@ -40,6 +40,34 @@
         </a>
       </li>
 
+      <!-- Seção Operacional — somente administrador -->
+      {% if usuario.perfil.value == 'administrador' %}
+      <li class="nav-item mt-3 mb-1">
+        <span class="sidebar-section-label">Operacional</span>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/chamados') %}active{% endif %}"
+           href="/admin/chamados">
+          <i class="bi bi-headset me-2"></i><span>Chamados</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/funcionarios') %}active{% endif %}"
+           href="/admin/funcionarios">
+          <i class="bi bi-people me-2"></i><span>Funcionários</span>
+        </a>
+      </li>
+      <li class="nav-item mt-3 mb-1">
+        <span class="sidebar-section-label">Sistema</span>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/usuarios') %}active{% endif %}"
+           href="/admin/usuarios">
+          <i class="bi bi-person-lock me-2"></i><span>Acessos</span>
+        </a>
+      </li>
+      {% endif %}
+
       <!-- Seção Inteligência -->
       <li class="nav-item mt-3 mb-1">
         <span class="sidebar-section-label">Inteligência</span>
@@ -50,12 +78,14 @@
           <i class="bi bi-robot me-2"></i><span>Assistente IA</span>
         </a>
       </li>
+      {% if usuario.perfil.value == 'administrador' %}
       <li class="nav-item">
         <a class="nav-link {% if request.url.path.startswith('/da') %}active{% endif %}"
            href="/da">
           <i class="bi bi-bar-chart-line me-2"></i><span>Data Analytics</span>
         </a>
       </li>
+      {% endif %}
     </ul>
 
     <!-- Rodapé -->
@@ -63,8 +93,14 @@
       <small class="text-secondary d-block mb-1" style="font-size:.75rem;">
         <i class="bi bi-person-circle me-1"></i> {{ usuario.nome }}
       </small>
-      <small class="text-secondary d-block mb-3" style="font-size:.7rem;opacity:.6;">
-        {{ usuario.perfil.value }}
+      <small class="d-block mb-3" style="font-size:.7rem;">
+        {% if usuario.perfil.value == 'administrador' %}
+          <span style="color:#ff4e17;opacity:.8;">Admin</span>
+        {% elif usuario.perfil.value == 'visualizador' %}
+          <span style="color:#6c757d;opacity:.8;">Visualizador</span>
+        {% else %}
+          <span style="color:#6c757d;opacity:.6;">{{ usuario.perfil.value }}</span>
+        {% endif %}
       </small>
       <a href="/auth/logout" class="btn btn-sm w-100"
          style="border:1px solid #ff4e17;color:#ff4e17;font-size:.75rem;">

@@ -25,6 +25,9 @@ def dashboard(
         return RedirectResponse(url="/superadmin", status_code=302)
     if usuario.perfil == PerfilUsuario.operador:
         return RedirectResponse(url="/tecnico", status_code=302)
+
+    # administrador e visualizador chegam aqui
+    can_edit = usuario.perfil != PerfilUsuario.visualizador
     total = (
         db.query(func.count(Patrimonio.id))
         .filter(Patrimonio.tenant_id == tenant.id)
@@ -58,5 +61,6 @@ def dashboard(
             "total": total,
             "status_map": status_map,
             "por_setor": por_setor,
+            "can_edit": can_edit,
         },
     )

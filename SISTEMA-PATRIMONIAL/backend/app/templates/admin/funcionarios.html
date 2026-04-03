@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Funcionários — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-people me-2 text-primary"></i>Funcionários
+  </h4>
+  <span class="text-muted small">{{ funcionarios | length }} registros</span>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-2">
+    <form method="GET" action="/admin/funcionarios" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold mb-1">Buscar</label>
+        <input type="text" name="busca" value="{{ busca }}" class="form-control form-control-sm"
+               placeholder="Nome ou matrícula..."/>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Cargo</label>
+        <select name="cargo_id" class="form-select form-select-sm">
+          <option value="">Todos os cargos</option>
+          {% for c in cargos %}
+            <option value="{{ c.id }}" {% if cargo_id == c.id|string %}selected{% endif %}>{{ c.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Filial</label>
+        <select name="filial_id" class="form-select form-select-sm">
+          <option value="">Todas as filiais</option>
+          {% for f in filiais %}
+            <option value="{{ f.id }}" {% if filial_id == f.id|string %}selected{% endif %}>{{ f.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-search me-1"></i>Filtrar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+    <span class="fw-semibold small">
+      <i class="bi bi-person-lines-fill me-2 text-primary"></i>Quadro de Pessoal
+    </span>
+    <span class="badge bg-secondary">{{ funcionarios | length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if funcionarios %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Matrícula</th>
+            <th>Nome</th>
+            <th>Cargo</th>
+            <th>Filial</th>
+            <th>Contato</th>
+            <th>Admissão</th>
+            <th>Status</th>
+            <th class="pe-3">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in funcionarios %}
+          <tr class="{% if not f.ativo %}opacity-50{% endif %}">
+            <td class="ps-3">
+              <code class="small">{{ f.matricula }}</code>
+            </td>
+            <td>
+              <div class="fw-semibold">{{ f.nome }}</div>
+              {% if f.gestor %}
+                <div class="text-muted" style="font-size:.73rem;">
+                  <i class="bi bi-diagram-3 me-1"></i>{{ f.gestor.nome }}
+                </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if f.cargo %}
+                <span class="badge bg-light text-dark border">{{ f.cargo.nome }}</span>
+                <div class="text-muted" style="font-size:.72rem;">Nível {{ f.cargo.nivel_hierarquico }}</div>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-muted">{{ f.filial.nome if f.filial else '—' }}</td>
+            <td>
+              {% if f.email %}
+                <a href="mailto:{{ f.email }}" class="text-muted text-decoration-none small">
+                  <i class="bi bi-envelope me-1"></i>{{ f.email }}
+                </a>
+              {% endif %}
+              {% if f.telefone %}
+                <div class="text-muted" style="font-size:.73rem;">
+                  <i class="bi bi-telephone me-1"></i>{{ f.telefone }}
+                </div>
+              {% endif %}
+              {% if not f.email and not f.telefone %}—{% endif %}
+            </td>
+            <td class="text-muted">
+              {{ f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '—' }}
+            </td>
+            <td>
+              {% if f.ativo %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border">Inativo</span>
+              {% endif %}
+            </td>
+            <td class="pe-3">
+              <form method="POST" action="/admin/funcionarios/{{ f.id }}/toggle"
+                    onsubmit="return confirm('{% if f.ativo %}Desativar{% else %}Ativar{% endif %} {{ f.nome }}?')">
+                <button class="btn btn-sm {% if f.ativo %}btn-outline-warning{% else %}btn-outline-success{% endif %}">
+                  {% if f.ativo %}
+                    <i class="bi bi-person-dash me-1"></i>Desativar
+                  {% else %}
+                    <i class="bi bi-person-check me-1"></i>Ativar
+                  {% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-people fs-1 d-block mb-2" style="opacity:.3;"></i>
+      <div>Nenhum funcionário encontrado.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
