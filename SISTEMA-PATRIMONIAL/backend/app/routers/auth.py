@@ -1,13 +1,23 @@
+import logging
+
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from jose import jwt as _jwt
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.middleware.rate_limit import (
+    get_ip_from_request,
+    registrar_falha_login,
+    registrar_sucesso_login,
+)
 from app.models.tenant import Tenant
 from app.models.usuario import Usuario
 from app.services.auth_service import login_com_supabase, logout_supabase
+
+_log = logging.getLogger("polsec.auth")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -33,19 +43,19 @@ def login(
     senha: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    ip = get_ip_from_request(request)
     try:
         tokens = login_com_supabase(email, senha)
     except Exception as exc:
-        import logging
-        logging.getLogger("polsec.auth").error("Falha login %s: %s", email, exc)
+        registrar_falha_login(ip)
+        _log.error("Falha login email=%s ip=%s: %s", email, ip, exc)
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "erro": "E-mail ou senha incorretos."},
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    # Extrai o tenant slug dos metadados do token (sem verificar assinatura — já verificado acima)
-    from jose import jwt as _jwt
+    # Extrai o tenant slug dos metadados do token
     _claims = _jwt.get_unverified_claims(tokens["access_token"])
     tenant_slug = (
         _claims.get("user_metadata", {}).get("slug")
@@ -91,6 +101,7 @@ def login(
             samesite="lax",
             max_age=7 * 24 * 3600,
         )
+    registrar_sucesso_login(ip)
     return response
 
 

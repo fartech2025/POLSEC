@@ -4,7 +4,7 @@ Assistente inteligente com acesso às ferramentas do sistema patrimonial via too
 """
 import json
 from typing import AsyncGenerator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func
 
 import anthropic
@@ -129,7 +129,9 @@ def _buscar_patrimonios(
     status: str = None,
     limite: int = 10,
 ) -> str:
-    query = db.query(Patrimonio).filter(Patrimonio.tenant_id == tenant_id)
+    query = db.query(Patrimonio).options(
+        selectinload(Patrimonio.responsavel)
+    ).filter(Patrimonio.tenant_id == tenant_id)
     if busca:
         termo = f"%{busca}%"
         query = query.filter(
@@ -191,7 +193,10 @@ def _obter_estatisticas(db: Session, tenant_id: str) -> str:
 def _listar_movimentacoes(
     db: Session, tenant_id: str, patrimonio_id: int = None, limite: int = 15
 ) -> str:
-    query = db.query(Movimentacao).filter(Movimentacao.tenant_id == tenant_id)
+    query = db.query(Movimentacao).options(
+        selectinload(Movimentacao.patrimonio),
+        selectinload(Movimentacao.usuario),
+    ).filter(Movimentacao.tenant_id == tenant_id)
     if patrimonio_id:
         query = query.filter(Movimentacao.patrimonio_id == patrimonio_id)
     movs = query.order_by(Movimentacao.created_at.desc()).limit(limite).all()

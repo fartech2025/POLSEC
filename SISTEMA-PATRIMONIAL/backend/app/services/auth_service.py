@@ -128,8 +128,9 @@ def decodificar_token(token: str) -> Optional[dict]:
 
 
 # ── Dependency: usuário autenticado ──────────────────────────────────────────
+import logging as _logging
 
-_log = __import__('logging').getLogger('polsec.auth')
+_log = _logging.getLogger('polsec.auth')
 
 
 def get_usuario_logado(
@@ -184,11 +185,18 @@ def get_usuario_logado(
         raise _redirecionar
 
     _log.info('AUTH OK: %s (%s)', usuario.email, usuario.perfil.value)
+    # Cacheia tenant no request.state para evitar segunda query em get_tenant_atual
+    request.state.tenant = tenant
     return usuario
 
 
 def get_tenant_atual(request: Request, db: Session = Depends(get_db)) -> Tenant:
-    """Retorna o Tenant corrente com base no slug resolvido pelo middleware."""
+    """Retorna o Tenant corrente. Usa cache do request.state quando disponível."""
+    # Fast path: get_usuario_logado já resolveu e guardou o tenant
+    cached = getattr(request.state, "tenant", None)
+    if cached is not None:
+        return cached
+    # Slow path: resolve independentemente (endpoints sem get_usuario_logado)
     slug = getattr(request.state, "tenant_slug", None)
     if not slug:
         raise HTTPException(status_code=400, detail="Tenant não identificado.")

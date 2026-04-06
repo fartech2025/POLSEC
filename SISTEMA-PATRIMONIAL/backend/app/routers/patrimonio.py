@@ -182,7 +182,7 @@ def editar(
     status: Optional[str] = Form(None),
     observacoes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    usuario=Depends(get_usuario_logado),
+    usuario=Depends(_exigir_escrita),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
     service = PatrimonioService(db, tenant.id)

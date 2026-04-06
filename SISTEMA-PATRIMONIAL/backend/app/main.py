@@ -1,11 +1,17 @@
+import asyncio
+import contextlib
+import logging
+from datetime import datetime, timedelta
+
 from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse, RedirectResponse
-import logging
 
 from app.config import settings
 from app.database import Base, engine
+from app.middleware.rate_limit import LoginRateLimitMiddleware
+from app.middleware.security import SecurityHeadersMiddleware
 from app.middleware.tenant import TenantMiddleware
 from app.routers import auth, patrimonio, movimentacao, dashboard, assistente, da
 from app.routers import tenant, superadmin, tecnico, admin
@@ -20,10 +26,56 @@ if settings.DATABASE_URL:
     except Exception as exc:
         logger.warning("Não foi possível criar tabelas no banco: %s", exc)
 
-app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
 
-# ── Middleware ────────────────────────────────────────────────────────────────
-app.add_middleware(TenantMiddleware)
+# ── Auditoria de segurança diária (2h) ───────────────────────────────────────
+
+_AUDIT_HOUR = 2  # hora do dia (0-23) para executar a varredura
+
+
+async def _daily_audit_loop() -> None:
+    """Agendador assíncrono: executa a auditoria de segurança diariamente às _AUDIT_HOUR:00."""
+    while True:
+        agora = datetime.now()
+        alvo = agora.replace(hour=_AUDIT_HOUR, minute=0, second=0, microsecond=0)
+        if alvo <= agora:
+            alvo += timedelta(days=1)
+        await asyncio.sleep((alvo - agora).total_seconds())
+        try:
+            from app.security.audit import executar_auditoria
+            await asyncio.to_thread(executar_auditoria)
+        except Exception as exc:
+            logger.error("Falha na auditoria de segurança diária: %s", exc)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    audit_task = asyncio.create_task(_daily_audit_loop())
+    logger.info(
+        "Auditoria de segurança agendada para %02d:00 diariamente",
+        _AUDIT_HOUR,
+    )
+    yield
+    audit_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await audit_task
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    # Docs visíveis apenas em modo DEBUG (ocultar em produção reduz superfície de ataque)
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
+    lifespan=lifespan,
+)
+
+# ── Middleware (ordem: último adicionado = mais externo = primeiro a processar) ──
+app.add_middleware(TenantMiddleware)           # innermost: resolve tenant
+app.add_middleware(SecurityHeadersMiddleware)  # middle:    injeta headers de segurança
+app.add_middleware(LoginRateLimitMiddleware)   # outermost: bloqueia brute-force antes de tudo
 
 # ── Static files ──────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
