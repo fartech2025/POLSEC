@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 import logging
 
 from app.config import settings
@@ -28,6 +28,22 @@ app.add_middleware(TenantMiddleware)
 # ── Static files ──────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
+
+# ── PWA: Service Worker e Manifest (devem ficar na raiz) ─────────────────────
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    return FileResponse(
+        "app/static/js/sw.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )
+
+@app.get("/manifest.json", include_in_schema=False)
+async def pwa_manifest():
+    return FileResponse(
+        "app/static/manifest.json",
+        media_type="application/manifest+json",
+    )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])

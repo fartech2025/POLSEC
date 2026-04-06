@@ -1,0 +1,20 @@
+{
+  "name": "POLSEC — Gestão Patrimonial",
+  "short_name": "POLSEC",
+  "description": "Sistema de gestão patrimonial e chamados técnicos POLSEC",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#ff4e17",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "https://nolchmlmkebfuiamxvml.supabase.co/storage/v1/object/public/POLSEC%20IMAGES/PNG/POLSEC_MARCA_Artboard%201%20copy%2016.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
