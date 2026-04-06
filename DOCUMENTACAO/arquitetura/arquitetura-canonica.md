@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.6  
+> **Versão:** 3.7  
 > **Data:** 06/04/2026  
-> **Commit HEAD:** `bd29b9e`  
+> **Commit HEAD:** `0f81b05`  
 > **Branch:** `main`
 
 ---
@@ -649,6 +649,7 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 
 | Commit | Descrição |
 |---|---|
+| `0f81b05` | feat: indicador visual de status da IA (dot verde/vermelho na sidebar + ícone no chat) |
 | `bd29b9e` | feat: admin configura chave Claude via interface web — TenantConfigService + Fernet |
 | `9fb140e` | security: hardening nível bancário — SecurityHeaders, RateLimit, auditoria diária, OWASP fixes |
 | `478675b` | docs: arquitetura canônica v3.5 — TenantMiddleware IP fix |
@@ -801,6 +802,19 @@ Se o tenant não tiver chave configurada, `chat_stream()` usa `settings.ANTHROPI
 `GET /admin/integracoes` — exibe estado atual (chave mascarada ou aviso de ausência)  
 `POST /admin/integracoes` — salvar nova chave ou remover existente  
 Link na sidebar: **Sistema → Integrações IA** (visível para `administrador` e `superadmin`)
+
+### Indicador Visual de Status (`0f81b05`)
+
+`GET /assistente/status` — endpoint JSON protegido por auth, retorna `{"conectado": bool}`.  
+Usado por dois mecanismos:
+
+1. **Sidebar** (`base.html`, `base_tecnico.html`): dot circular `8×8 px` ao lado de "Assistente IA"  
+   - Cinza enquanto carrega → **verde** `#198754` se `conectado: true` → **vermelho** `#dc3545` se `false`  
+   - Preenchido via `fetch('/assistente/status')` no load de qualquer página
+
+2. **Página do chat** (`chat.html`): renderizado server-side via Jinja (`ia_conectada`)  
+   - Ícone `bi-robot` → `text-success` (verde) ou `text-danger` (vermelho)  
+   - Badge: `● Conectado · Claude` (verde) ou `● Sem chave configurada` (vermelho)
 
 ---
 
