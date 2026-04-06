@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.5  
+> **Versão:** 3.6  
 > **Data:** 06/04/2026  
-> **Commit HEAD:** `f4537dc`  
+> **Commit HEAD:** `bd29b9e`  
 > **Branch:** `main`
 
 ---
@@ -40,6 +40,7 @@ Anthropic Claude (Assistente IA)
 | CSS framework | Bootstrap 5 + Bootstrap Icons | — |
 | Fonte | Barlow (Google Fonts) / Helixa | — |
 | IA | Anthropic Claude | API |
+| Criptografia | cryptography (Fernet / AES-128-CBC) | ≥42.0.0 |
 | Validação settings | pydantic-settings | — |
 
 ---
@@ -60,7 +61,9 @@ backend/
 │   ├── config.py                 # Settings via pydantic-settings (.env)
 │   ├── database.py               # Engine SQLAlchemy, SessionLocal, Base
 │   ├── middleware/
-│   │   └── tenant.py             # TenantMiddleware — injeta tenant no request
+│   │   ├── tenant.py             # TenantMiddleware — injeta tenant no request
+│   │   ├── security.py           # SecurityHeadersMiddleware — CSP, HSTS, X-Frame-Options
+│   │   └── rate_limit.py         # LoginRateLimitMiddleware — 5 tentativas/IP/15 min
 │   ├── models/                   # ORM models (SQLAlchemy Declarative)
 │   │   ├── tenant.py
 │   │   ├── usuario.py            # PerfilUsuario enum: superadmin|administrador|operador|visualizador
@@ -91,6 +94,9 @@ backend/
 │   │   ├── assistente.py         # Chat IA (Anthropic Claude)
 │   │   ├── da.py                 # Data Analytics
 │   │   └── tenant.py             # Auto-registro de empresa
+│   ├── security/
+│   │   ├── __init__.py
+│   │   └── audit.py              # Auditoria automática diária — 5 verificações de segurança
 │   ├── services/
 │   │   ├── auth_service.py       # Verificação JWT ES256 via JWKS, get_usuario_logado
 │   │   ├── chamado_service.py    # Lógica de negócio de chamados
@@ -98,7 +104,8 @@ backend/
 │   │   ├── patrimonio_service.py
 │   │   ├── tenant_service.py
 │   │   ├── da_service.py
-│   │   ├── llm_service.py        # Integração Anthropic Claude
+│   │   ├── llm_service.py        # Integração Anthropic Claude (aceita api_key por tenant)
+│   │   ├── config_service.py     # TenantConfigService — configurações sensíveis com Fernet
 │   │   ├── rbac_service.py       # RBAC helper
 │   │   └── storage_service.py    # Supabase Storage
 │   ├── schemas/                  # Pydantic schemas (validação de entrada)
@@ -115,7 +122,8 @@ backend/
 │   │   │   ├── chamados.html
 │   │   │   ├── funcionarios.html
 │   │   │   ├── usuarios.html
-│   │   │   └── sla.html          # Configuração de SLA por prioridade
+│   │   │   ├── sla.html          # Configuração de SLA por prioridade
+│   │   │   └── integracoes.html  # Configuração da chave API Claude por tenant
 │   │   ├── tecnico/
 │   │   │   ├── painel.html       # Lista de chamados com badges SLA
 │   │   │   ├── chamado.html      # Detalhe/atualização de chamado
@@ -337,9 +345,16 @@ SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 DATABASE_URL=postgresql+psycopg://postgres.<id>:<pass>@aws-0-<region>.pooler.supabase.com:6543/postgres
 SUPABASE_JWT_SECRET=...
-ANTHROPIC_API_KEY=...
+ANTHROPIC_API_KEY=...   # fallback global; cada tenant pode sobrescrever via /admin/integracoes
+SECRET_KEY=...          # chave Fernet para cifrar dados sensíveis (gere com Fernet.generate_key())
 DEBUG=false
+SEC_AUDIT_DIR=/tmp      # diretório de relatórios de auditoria de segurança (opcional)
 ```
+
+> **Gerar SECRET_KEY:**
+> ```bash
+> python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+> ```
 
 ---
 
@@ -634,6 +649,9 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 
 | Commit | Descrição |
 |---|---|
+| `bd29b9e` | feat: admin configura chave Claude via interface web — TenantConfigService + Fernet |
+| `9fb140e` | security: hardening nível bancário — SecurityHeaders, RateLimit, auditoria diária, OWASP fixes |
+| `478675b` | docs: arquitetura canônica v3.5 — TenantMiddleware IP fix |
 | `f4537dc` | Fix TenantMiddleware: ignora IPs/localhost ao extrair subdomínio (bug 127→slug) |
 | `8beb067` | Onboarding por nível de usuário (modal multi-step, localStorage) |
 | `f9ee2e2` | Arquitetura canônica v3.3 — seção PWA offline |
@@ -655,7 +673,138 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 
 ---
 
-## 16. Onboarding por Nível de Usuário
+## 16. Segurança (Nível Bancário)
+
+Implementado no commit `9fb140e`. Os três mecanismos atuam em camadas no pipeline de middlewares.
+
+### Ordem dos Middlewares
+
+```
+Request
+  │
+  ▼
+LoginRateLimitMiddleware  (outermost — protege antes de qualquer processamento)
+  │
+  ▼
+SecurityHeadersMiddleware
+  │
+  ▼
+TenantMiddleware          (innermost — resolve tenant antes dos handlers)
+  │
+  ▼
+FastAPI handlers
+```
+
+### SecurityHeadersMiddleware (`app/middleware/security.py`)
+
+| Header | Valor | Proteção |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' cdn.jsdelivr.net ...` | XSS injection |
+| `X-Frame-Options` | `DENY` | Clickjacking |
+| `X-Content-Type-Options` | `nosniff` | MIME sniffing |
+| `X-XSS-Protection` | `1; mode=block` | Browser XSS filter |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Leak de URL |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` | Feature abuse |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | HTTPS only (HTTPS apenas) |
+| `Cache-Control` | `no-store, no-cache` | Páginas autenticadas não cacheadas |
+
+### LoginRateLimitMiddleware (`app/middleware/rate_limit.py`)
+
+- **Janela:** 15 minutos por IP
+- **Limite:** 5 tentativas de login falhadas
+- **Resposta:** HTTP 429 com header `Retry-After`
+- **API pública:** `registrar_falha_login(ip)`, `registrar_sucesso_login(ip)`, `ip_bloqueado(ip)`
+- Sucesso no login limpa o contador do IP
+
+### Auditoria Automática Diária (`app/security/audit.py`)
+
+Roda às **02:00** via `asyncio` loop registrado no lifespan do FastAPI.
+
+| Verificação | Critério de alerta |
+|---|---|
+| Contas estagnadas | Usuários sem login há > 90 dias |
+| Excesso de privilégio | Mais de 3 superadmins cadastrados |
+| Volume anômalo de auditoria | z-score > 3σ em qualquer tenant |
+| UIDs órfãos | Usuários inativos com `supabase_uid` preenchido |
+| IPs sob força-bruta | IPs com ≥ 5 falhas na janela de rate limit |
+
+Saída: `/tmp/security_audit_YYYY-MM-DD.json` (configurável via `SEC_AUDIT_DIR`).
+
+Execução manual: `python -m app.security.audit`
+
+### Fixes OWASP (commit `9fb140e`)
+
+- **OWASP A01 (Broken Access Control):** `POST /{patrimonio_id}/editar` usava `Depends(get_usuario_logado)` em vez de `Depends(_exigir_escrita)` — visualizadores podiam editar patrimônios. Corrigido.
+- **N+1 no LLM service:** `selectinload` adicionado para `Patrimonio.responsavel`, `Movimentacao.patrimonio` e `Movimentacao.usuario`.
+- **Docs/OpenAPI** ocultos em produção (`DEBUG=False`).
+
+---
+
+## 17. Integração IA — Chave Claude por Tenant
+
+Implementado no commit `bd29b9e`.
+
+### Problema
+
+Antes, a chave `ANTHROPIC_API_KEY` era única e global (`.env`). Em um ambiente SaaS multi-tenant, cada cliente deve usar sua própria chave — isolamento de cobrança e de acesso.
+
+### Solução
+
+```
+admin acessa /admin/integracoes
+  │ cola sk-ant-api03-...
+  ▼
+TenantConfigService.set_llm_api_key(db, key)
+  │ Fernet.encrypt(key) → token cifrado
+  ▼
+tenant.configuracoes = JSON { "llm_api_key": "<fernet_token>" }
+  │ persiste no banco (plaintext NUNCA salvo)
+  ▼
+request /assistente/chat
+  │
+TenantConfigService.get_llm_api_key() → decrypt → str
+  │ passado como api_key para chat_stream()
+  ▼
+anthropic.Anthropic(api_key=tenant_key or settings.ANTHROPIC_API_KEY)
+```
+
+### TenantConfigService (`app/services/config_service.py`)
+
+| Método | Descrição |
+|---|---|
+| `set_llm_api_key(db, key)` | Valida prefixo `sk-ant-`, cifra com Fernet, persiste no JSON `configuracoes` |
+| `get_llm_api_key()` | Decifra e retorna plaintext — **nunca exposto ao frontend** |
+| `get_llm_api_key_masked()` | Retorna `sk-ant-api03-••••••••••••••••XXXX` — seguro para exibição |
+| `has_llm_api_key()` | `bool` — indica se o tenant tem chave configurada |
+| `remove_llm_api_key(db)` | Remove do JSON e persiste |
+
+### Armazenamento
+
+A chave é armazenada no campo `configuracoes` (Text/JSON) já existente no modelo `Tenant`, sem necessidade de nova coluna:
+
+```json
+{ "llm_api_key": "gAAAAAB..." }
+```
+
+### Criptografia
+
+- **Algoritmo:** Fernet = AES-128-CBC + HMAC-SHA256
+- **Chave mestra:** `SECRET_KEY` no `.env` (gerada com `Fernet.generate_key()`)
+- **Biblioteca:** `cryptography>=42.0.0`
+
+### Fallback
+
+Se o tenant não tiver chave configurada, `chat_stream()` usa `settings.ANTHROPIC_API_KEY` do `.env` — compatibilidade retroativa garantida.
+
+### Interface Admin
+
+`GET /admin/integracoes` — exibe estado atual (chave mascarada ou aviso de ausência)  
+`POST /admin/integracoes` — salvar nova chave ou remover existente  
+Link na sidebar: **Sistema → Integrações IA** (visível para `administrador` e `superadmin`)
+
+---
+
+## 18. Onboarding por Nível de Usuário
 
 Modal de boas-vindas exibido na **primeira visita** de cada perfil, controlado via `localStorage`.
 
@@ -677,6 +826,27 @@ Para forçar re-exibição do onboarding (debug / reset):
 ```js
 // Console do browser
 localStorage.removeItem('polsec_onboarding_v1_administrador')
+```
+
+---
+
+## 19. Comandos de Operação
+
+```bash
+# Iniciar servidor
+cd SISTEMA-PATRIMONIAL/backend && source .venv/bin/activate && python run.py
+
+# Gerar nova SECRET_KEY (Fernet)
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Executar auditoria de segurança manualmente
+python -m app.security.audit
+
+# Importar planilha patrimonial (dry-run)
+python importar_patrimonio.py --dry-run
+
+# Importar planilha patrimonial (real)
+python importar_patrimonio.py
 ```
 
 ### Conteúdo por Perfil
