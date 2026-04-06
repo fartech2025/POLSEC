@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.3  
-> **Data:** 03/04/2026  
-> **Commit HEAD:** `4308709`  
+> **Versão:** 3.4  
+> **Data:** 06/04/2026  
+> **Commit HEAD:** `8beb067`  
 > **Branch:** `main`
 
 ---
@@ -247,9 +247,9 @@ Dependência FastAPI injetada nos routers
 ```
 GET /dashboard
   ├── superadmin    → /superadmin
-  ├── administrador → /admin/chamados
-  ├── operador      → /tecnico
-  └── visualizador  → /patrimonio
+  ├── administrador → /dashboard (visão KPIs + gráficos)
+  ├── operador      → /tecnico (painel de chamados)
+  └── visualizador  → /dashboard (somente leitura)
 ```
 
 ### Painel do Técnico — Destaques
@@ -622,6 +622,8 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 
 | Commit | Descrição |
 |---|---|
+| `8beb067` | Onboarding por nível de usuário (modal multi-step, localStorage) |
+| `f9ee2e2` | Arquitetura canônica v3.3 — seção PWA offline |
 | `4308709` | PWA offline — Service Worker + IndexedDB sync queue |
 | `b646f34` | Arquitetura canônica v3.2 — paginação, logo POLSEC, histórico |
 | `4e8173f` | Logo POLSEC no sidebar (base.html e base_tecnico.html) |
@@ -637,3 +639,46 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 | `699c955` | Visões completas por hierarquia |
 | `64660f0` | Telas superadmin FARTECH separadas da interface POLSEC |
 | `9ffc5b9` | Login ES256 JWKS + cookie tenant_slug |
+
+---
+
+## 16. Onboarding por Nível de Usuário
+
+Modal de boas-vindas exibido na **primeira visita** de cada perfil, controlado via `localStorage`.
+
+### Implementação
+
+| Arquivo | Função |
+|---|---|
+| `app/static/js/onboarding.js` | Modal JS puro (sem dependência extra), lê `data-perfil` do `<body>` |
+| `base.html`, `base_tecnico.html`, `base_superadmin.html` | Inject `data-perfil="{{ usuario.perfil.value }}"` no `<body>` + `<script onboarding.js defer>` |
+
+### Controle de exibição
+
+```js
+localStorage.getItem('polsec_onboarding_v1_<perfil>') === '1'  // já viu
+localStorage.setItem('polsec_onboarding_v1_<perfil>', '1')      // marcar visto
+```
+
+Para forçar re-exibição do onboarding (debug / reset):
+```js
+// Console do browser
+localStorage.removeItem('polsec_onboarding_v1_administrador')
+```
+
+### Conteúdo por Perfil
+
+| Perfil | Steps | Destaque |
+|---|---|---|
+| `superadmin` | 3 | Plataforma FARTECH, gestão de tenants, acesso privilegiado |
+| `administrador` | 4 | Dashboard KPIs, patrimônios, chamados+SLA, usuários |
+| `operador` | 3 | Painel chamados, atualizar status, modo offline offline |
+| `visualizador` | 2 | Acesso somente leitura, o que pode visualizar |
+
+### Design do Modal
+
+- Progress bar colorida por perfil (laranja POLSEC ou azul técnico)
+- Botões: **Próximo / Anterior / Entendido! / Pular**
+- Fecha ao clicar no backdrop
+- Sem dependência de Bootstrap Modal (DOM próprio, z-index 1055)
+- Compatível com PWA (funciona offline, assets já cacheados pelo SW)
