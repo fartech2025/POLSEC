@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.4  
+> **Versão:** 3.5  
 > **Data:** 06/04/2026  
-> **Commit HEAD:** `8beb067`  
+> **Commit HEAD:** `f4537dc`  
 > **Branch:** `main`
 
 ---
@@ -208,16 +208,28 @@ GET /dashboard → redireciona por perfil
 
 ```
 TenantMiddleware
-  │  Lê cookie tenant_slug → injeta request.state.tenant
+  │  Resolve tenant slug na ordem:
+  │    1. Subdomínio (host com ≥3 partes, exceto www/app/api)
+  │       ⚠️ IPs (ex: 127.0.0.1) e localhost são ignorados nesta etapa
+  │    2. Header X-Tenant-Slug
+  │    3. Cookie tenant_slug
+  │  Injeta request.state.tenant
   ▼
 auth_service.get_usuario_logado()
   │  Lê cookie access_token
   │  Busca JWKS em <SUPABASE_URL>/auth/v1/.well-known/jwks.json (algoritmo ES256)
   │  Verifica assinatura + expiração
   │  Busca Usuario no DB por supabase_uid
+  │  Loga resultado: AUTH OK / AUTH FAIL com motivo (logger polsec.auth)
   ▼
 Dependência FastAPI injetada nos routers
 ```
+
+> **Nota de implementação — IPs vs subdomínios:** ao rodar localmente (`127.0.0.1`),
+> dividir o host por `.` produziria `["127","0","0","1"]` (4 partes ≥ 3), fazendo o
+> middleware interpretar `"127"` como tenant slug, quebrando o login. O middleware
+> detecta endereços IPv4 via regex antes de tentar extrair subdomínio, pulando direto
+> para o fallback de cookie (`tenant_slug`). Commit `f4537dc`.
 
 ### Perfis e Permissões
 
@@ -622,6 +634,7 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 
 | Commit | Descrição |
 |---|---|
+| `f4537dc` | Fix TenantMiddleware: ignora IPs/localhost ao extrair subdomínio (bug 127→slug) |
 | `8beb067` | Onboarding por nível de usuário (modal multi-step, localStorage) |
 | `f9ee2e2` | Arquitetura canônica v3.3 — seção PWA offline |
 | `4308709` | PWA offline — Service Worker + IndexedDB sync queue |
