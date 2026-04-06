@@ -129,6 +129,9 @@ def decodificar_token(token: str) -> Optional[dict]:
 
 # ── Dependency: usuário autenticado ──────────────────────────────────────────
 
+_log = __import__('logging').getLogger('polsec.auth')
+
+
 def get_usuario_logado(
     request: Request,
     access_token: Optional[str] = Cookie(default=None),
@@ -145,29 +148,30 @@ def get_usuario_logado(
     )
 
     if not access_token:
+        _log.warning('AUTH FAIL: sem cookie access_token')
         raise _redirecionar
 
     payload = decodificar_token(access_token)
     if not payload:
+        _log.warning('AUTH FAIL: token inválido/expirado')
         raise _redirecionar
 
     supabase_uid = payload.get("sub")
     if not supabase_uid:
+        _log.warning('AUTH FAIL: sem sub no token')
         raise _redirecionar
 
     # Tenant corrente (resolvido pelo middleware)
     tenant_slug = getattr(request.state, "tenant_slug", None)
-
-    # Tenant é OBRIGATÓRIO para isolamento multitenant.
-    # Sem slug não há como garantir que o usuário pertence ao tenant correto.
-    tenant_slug = getattr(request.state, "tenant_slug", None)
     if not tenant_slug:
+        _log.warning('AUTH FAIL: tenant_slug ausente (cookies: %s)', list(request.cookies.keys()))
         raise _redirecionar
 
     tenant = db.query(Tenant).filter(
         Tenant.slug == tenant_slug, Tenant.ativo == True
     ).first()
     if not tenant:
+        _log.warning('AUTH FAIL: tenant "%s" não encontrado', tenant_slug)
         raise _redirecionar
 
     usuario = db.query(Usuario).filter(
@@ -176,8 +180,10 @@ def get_usuario_logado(
         Usuario.ativo == True,
     ).first()
     if not usuario:
+        _log.warning('AUTH FAIL: usuário uid=%s não encontrado no tenant "%s"', supabase_uid, tenant_slug)
         raise _redirecionar
 
+    _log.info('AUTH OK: %s (%s)', usuario.email, usuario.perfil.value)
     return usuario
 
 

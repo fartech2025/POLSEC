@@ -7,9 +7,12 @@ Estratégia de resolução (em ordem):
   2. Header:     X-Tenant-Slug: emtel
   3. Cookie:     tenant_slug=emtel  (fallback dev)
 """
+import re
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+_IP_RE = re.compile(r'^\d{1,3}(\.\d{1,3}){3}(:\d+)?$')
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
@@ -19,13 +22,15 @@ class TenantMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
     def _resolver_slug(self, request: Request) -> str | None:
-        # 1. Subdomínio
         host = request.headers.get("host", "")
-        partes = host.split(".")
-        if len(partes) >= 3:
-            candidato = partes[0]
-            if candidato not in ("www", "app", "api"):
-                return candidato
+
+        # 1. Subdomínio — ignora hosts IP (localhost dev) e localhost puro
+        if not _IP_RE.match(host) and not host.startswith("localhost"):
+            partes = host.split(".")
+            if len(partes) >= 3:
+                candidato = partes[0]
+                if candidato not in ("www", "app", "api"):
+                    return candidato
 
         # 2. Header customizado (útil em dev e API)
         if slug := request.headers.get("x-tenant-slug"):
