@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.tenant import Tenant
 from app.services.auth_service import get_tenant_atual, get_usuario_logado
+from app.services.config_service import TenantConfigService
 from app.services.llm_service import chat_stream
 
 router = APIRouter()
@@ -37,8 +38,11 @@ async def chat(
     body = await request.json()
     mensagens = body.get("mensagens", [])
 
+    svc = TenantConfigService(tenant)
+    api_key = svc.get_llm_api_key()  # None se não configurado → fallback em llm_service
+
     return StreamingResponse(
-        chat_stream(mensagens, db, tenant.id),
+        chat_stream(mensagens, db, tenant.id, api_key=api_key),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

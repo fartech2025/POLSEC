@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # ── IA ───────────────────────────────────────────────────────────────────
     ANTHROPIC_API_KEY: str = ""
 
+    # ── Segurança ─────────────────────────────────────────────────────────────
+    # Chave Fernet para cifrar valores sensíveis armazenados no banco (ex: API keys de tenants).
+    # Gere com: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    SECRET_KEY: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"

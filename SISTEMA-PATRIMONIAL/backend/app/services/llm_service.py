@@ -245,13 +245,19 @@ def _buscar_por_codigo(db: Session, tenant_id: str, codigo: str) -> str:
 
 
 async def chat_stream(
-    mensagens: list[dict], db: Session, tenant_id: str
+    mensagens: list[dict],
+    db: Session,
+    tenant_id: str,
+    api_key: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """
     Gera resposta do assistente com streaming via SSE.
     Executa o loop agentico: Claude → tool_use → executa → retorna resultado → Claude.
+
+    api_key: chave do tenant (preferencial). Recai na variável de ambiente ANTHROPIC_API_KEY.
     """
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    resolved_key = api_key or settings.ANTHROPIC_API_KEY
+    client = anthropic.Anthropic(api_key=resolved_key)
 
     historico = list(mensagens)
 

@@ -375,3 +375,64 @@ def admin_sla_resetar(
     db.query(SLAConfig).filter(SLAConfig.tenant_id == tenant.id).delete()
     db.commit()
     return RedirectResponse(url="/admin/sla?msg=resetado", status_code=303)
+
+
+# ── Integrações (Claude / LLM) ────────────────────────────────────────────────
+
+from typing import Optional as _Optional  # noqa: E402
+from app.services.config_service import TenantConfigService  # noqa: E402
+
+
+@router.get("/integracoes", response_class=HTMLResponse)
+def admin_integracoes(
+    request: Request,
+    msg: str = "",
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_admin),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    svc = TenantConfigService(tenant)
+    return templates.TemplateResponse(
+        "admin/integracoes.html",
+        {
+            "request": request,
+            "usuario": usuario,
+            "tenant": tenant,
+            "chave_mascarada": svc.get_llm_api_key_masked(),
+            "tem_chave": svc.has_llm_api_key(),
+            "msg": msg,
+        },
+    )
+
+
+@router.post("/integracoes")
+def admin_integracoes_salvar(
+    request: Request,
+    acao: str = Form(...),
+    api_key: _Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(_exigir_admin),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    svc = TenantConfigService(tenant)
+    if acao == "salvar":
+        try:
+            svc.set_llm_api_key(db, api_key or "")
+        except ValueError as exc:
+            return templates.TemplateResponse(
+                "admin/integracoes.html",
+                {
+                    "request": request,
+                    "usuario": usuario,
+                    "tenant": tenant,
+                    "chave_mascarada": svc.get_llm_api_key_masked(),
+                    "tem_chave": svc.has_llm_api_key(),
+                    "msg": f"erro:{exc}",
+                },
+                status_code=400,
+            )
+        return RedirectResponse(url="/admin/integracoes?msg=salvo", status_code=303)
+    elif acao == "remover":
+        svc.remove_llm_api_key(db)
+        return RedirectResponse(url="/admin/integracoes?msg=removido", status_code=303)
+    raise HTTPException(status_code=400, detail="Ação inválida.")

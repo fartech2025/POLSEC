@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Integrações — Assistente IA{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">
+      <i class="bi bi-robot me-2 text-primary"></i>Integrações — Assistente IA
+    </h4>
+    <small class="text-muted">Configure as credenciais do assistente Claude para — {{ tenant.nome }}</small>
+  </div>
+</div>
+
+{# ── Alertas de retorno ── #}
+{% if msg == 'salvo' %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-check-circle me-2"></i>Chave de API salva com sucesso. O assistente já está operacional.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif msg == 'removido' %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  <i class="bi bi-trash me-2"></i>Chave de API removida. O assistente usará a chave global (se configurada).
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif msg and msg.startswith('erro:') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+  <i class="bi bi-exclamation-triangle me-2"></i><strong>Erro:</strong> {{ msg[5:] }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{# ── Card informativo ── #}
+<div class="alert alert-light border mb-4">
+  <div class="row g-2 align-items-start">
+    <div class="col-auto">
+      <i class="bi bi-shield-lock text-primary fs-5"></i>
+    </div>
+    <div class="col">
+      <strong>Como funciona?</strong><br>
+      <span class="text-muted small">
+        A chave de API é <strong>criptografada</strong> com AES-128 antes de ser salva no banco de dados.
+        O sistema nunca armazena nem exibe a chave em texto puro — apenas os últimos 4 caracteres são mostrados
+        para confirmação visual. Obtenha sua chave em
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">
+          console.anthropic.com
+        </a>.
+      </span>
+    </div>
+  </div>
+</div>
+
+{# ── Status atual ── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom fw-semibold small">
+    <i class="bi bi-key me-2 text-primary"></i>Chave API Anthropic (Claude)
+  </div>
+  <div class="card-body">
+
+    {% if tem_chave %}
+    {# Chave já configurada — mostra mascarada + ações #}
+    <div class="d-flex align-items-center gap-3 mb-4 p-3 bg-success-subtle border border-success-subtle rounded">
+      <i class="bi bi-check-circle-fill text-success fs-4"></i>
+      <div>
+        <div class="fw-semibold text-success">Chave configurada</div>
+        <code class="text-muted small">{{ chave_mascarada }}</code>
+      </div>
+    </div>
+
+    {# Formulário: atualizar chave #}
+    <form method="POST" action="/admin/integracoes" class="mb-3">
+      <input type="hidden" name="acao" value="salvar">
+      <label class="form-label fw-semibold small">Substituir por uma nova chave</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-key"></i></span>
+        <input
+          type="password"
+          name="api_key"
+          class="form-control"
+          placeholder="sk-ant-api03-..."
+          autocomplete="new-password"
+          required
+          minlength="20"
+        >
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-floppy me-1"></i>Atualizar
+        </button>
+      </div>
+      <div class="form-text">A chave anterior será descartada imediatamente após salvar.</div>
+    </form>
+
+    {# Formulário: remover chave #}
+    <form method="POST" action="/admin/integracoes"
+          onsubmit="return confirm('Remover a chave API? O assistente perderá acesso ao Claude.')">
+      <input type="hidden" name="acao" value="remover">
+      <button type="submit" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-trash me-1"></i>Remover chave
+      </button>
+    </form>
+
+    {% else %}
+    {# Chave não configurada — formulário de cadastro inicial #}
+    <div class="d-flex align-items-center gap-3 mb-4 p-3 bg-warning-subtle border border-warning-subtle rounded">
+      <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+      <div>
+        <div class="fw-semibold">Nenhuma chave configurada</div>
+        <span class="text-muted small">O assistente IA está inativo para este tenant até que uma chave seja cadastrada.</span>
+      </div>
+    </div>
+
+    <form method="POST" action="/admin/integracoes">
+      <input type="hidden" name="acao" value="salvar">
+      <label class="form-label fw-semibold small">Chave API Anthropic</label>
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-key"></i></span>
+        <input
+          type="password"
+          name="api_key"
+          class="form-control form-control-lg"
+          placeholder="sk-ant-api03-..."
+          autocomplete="new-password"
+          required
+          minlength="20"
+        >
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="bi bi-floppy me-1"></i>Salvar
+        </button>
+      </div>
+      <div class="form-text">
+        Encontre sua chave em
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">
+          console.anthropic.com → API Keys
+        </a>.
+      </div>
+    </form>
+    {% endif %}
+
+  </div>
+</div>
+
+{# ── Dica sobre models disponíveis ── #}
+<div class="card border-0 shadow-sm bg-light">
+  <div class="card-body">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-lightbulb me-2 text-warning"></i>Modelo utilizado</h6>
+    <p class="text-muted small mb-0">
+      O assistente usa o modelo <code>claude-opus-4-6</code> com capacidade de raciocínio estendido
+      (<em>extended thinking</em>). Certifique-se de que sua conta Anthropic tem acesso a esse modelo.
+      O custo é cobrado diretamente pela Anthropic conforme o uso.
+    </p>
+  </div>
+</div>
+
+{% endblock %}
