@@ -1,8 +1,8 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.2  
+> **Versão:** 3.3  
 > **Data:** 03/04/2026  
-> **Commit HEAD:** `4e8173f`  
+> **Commit HEAD:** `4308709`  
 > **Branch:** `main`
 
 ---
@@ -522,10 +522,108 @@ Com 8.008 registros no banco, a lista de patrimônios usa paginação server-sid
 
 ---
 
+## 15. Suporte Offline — PWA + Service Worker + IndexedDB
+
+Os técnicos operam em presídios sem sinal de internet. O sistema funciona offline e sincroniza automaticamente ao reconectar.
+
+### Arquitetura de Camadas
+
+```
+[Técnico offline]
+       │
+       ▼ submit de form
+[offline.js — intercepta form submit]
+       │ navigator.onLine === false
+       ▼
+[IndexedDB: polsec-offline-v1]
+  store: sync_queue
+  {id, url, method, body, label, timestamp, status}
+       │
+       ▼ window.online event
+[syncQueue() — replay POST requests]
+       │
+       ▼
+[FastAPI — endpoints existentes]
+```
+
+### Service Worker (`/sw.js` → `app/static/js/sw.js`)
+
+| Tipo de request | Estratégia |
+|---|---|
+| `/static/**`, CDN jsdelivr.net | **Cache-first** — serve do cache, atualiza em background |
+| HTML pages (same-origin GET) | **Network-first** — tenta rede, fallback ao cache |
+| POST requests | **Ignorado** — tratado pelo `offline.js` via JS |
+
+**Pré-cache no install:** `style.css`, `main.js`, `offline.js`, Bootstrap CSS/JS/Icons (CDN)
+
+### offline.js (`/static/js/offline.js`)
+
+| Função | Responsabilidade |
+|---|---|
+| `openDB()` | Abre `polsec-offline-v1` v1, cria store `sync_queue` |
+| `enqueue(op)` | Salva operação pendente no IndexedDB |
+| `getPendingOps()` | Retorna operações com `status:'pending'` ordenadas por timestamp |
+| `updateOpStatus(id, s)` | Marca `synced` ou `failed` |
+| `interceptForms()` | Captura `submit` quando offline → IndexedDB (ignora `[data-no-offline]`) |
+| `syncQueue()` | Itera pendentes, replays via `fetch()`, reload em 2s se tudo OK |
+| `showBanner(state, n)` | Banner fixo: offline (vermelho) / syncing (laranja) / synced (verde) |
+| `showToast(msg, type)` | Notificação bottom-right |
+| `registerSW()` | Registra `/sw.js` com scope `/` |
+
+### PWA Manifest (`/manifest.json` → `app/static/manifest.json`)
+
+```json
+{
+  "name": "POLSEC — Gestão Patrimonial",
+  "short_name": "POLSEC",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "theme_color": "#ff4e17"
+}
+```
+
+### Rotas adicionadas no `main.py`
+
+```
+GET /sw.js           → FileResponse(app/static/js/sw.js) + Service-Worker-Allowed: /
+GET /manifest.json   → FileResponse(app/static/manifest.json)
+```
+
+### Templates atualizados
+
+Todos os base templates (`base.html`, `base_tecnico.html`, `base_superadmin.html`) receberam:
+```html
+<link rel="manifest" href="/manifest.json"/>
+<meta name="theme-color" content="#ff4e17"/>
+<!-- ... -->
+<script src="/static/js/offline.js" defer></script>
+```
+
+O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirado.
+
+### Cenário de operação offline
+
+1. Técnico visita o sistema **online** → Service Worker cacheia páginas e assets
+2. Técnico entra no presídio (**sem sinal**) → banner vermelho aparece
+3. Técnico atualiza status de chamado → form interceptado → salvo no IndexedDB
+4. Ao sair do presídio (**sinal volta**) → `syncQueue()` dispara automaticamente
+5. Operações são reenviadas para os endpoints originais por ordem de timestamp
+6. Página recarrega após 2s → dados atualizados exibidos
+
+### Edge cases documentados
+
+- **Cookie expirado após ausência longa (>7d):** sync redireciona para login (aceitável)
+- **Conflito de edição:** last-write-wins por ordem de timestamp
+- **Páginas não cacheadas offline:** SW silenciosamente não serve (usuário vê erro de rede normal)
+
+---
+
 ## 14. Histórico de Commits Relevantes
 
 | Commit | Descrição |
 |---|---|
+| `4308709` | PWA offline — Service Worker + IndexedDB sync queue |
+| `b646f34` | Arquitetura canônica v3.2 — paginação, logo POLSEC, histórico |
 | `4e8173f` | Logo POLSEC no sidebar (base.html e base_tecnico.html) |
 | `57d7b08` | Paginação + filtro categoria + KPIs na lista de patrimônios (8k+ registros) |
 | `9c57c2d` | Arquitetura canônica v3.1 — documentação da importação FOR IE02 |
