@@ -90,7 +90,10 @@
       <li class="nav-item">
         <a class="nav-link {% if request.url.path.startswith('/assistente') %}active{% endif %}"
            href="/assistente">
-          <i class="bi bi-robot me-2"></i><span>Assistente IA</span>
+          <i class="bi bi-robot me-2" id="ai-sidebar-icon"></i><span>Assistente IA</span>
+          <span id="ai-status-dot"
+                style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6c757d;margin-left:5px;vertical-align:middle;"
+                title="Verificando..."></span>
         </a>
       </li>
       {% if usuario.perfil.value == 'administrador' %}
@@ -134,6 +137,14 @@
 <script src="/static/js/main.js"></script>
 <script src="/static/js/offline.js" defer></script>
 <script src="/static/js/onboarding.js" defer></script>
+<script>
+fetch('/assistente/status').then(r=>r.json()).then(d=>{
+  const dot=document.getElementById('ai-status-dot');
+  if(!dot)return;
+  if(d.conectado){dot.style.background='#198754';dot.title='IA conectada';}
+  else{dot.style.background='#dc3545';dot.title='Chave não configurada';}
+}).catch(()=>{const dot=document.getElementById('ai-status-dot');if(dot){dot.style.background='#dc3545';dot.title='Sem conexão';}});
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

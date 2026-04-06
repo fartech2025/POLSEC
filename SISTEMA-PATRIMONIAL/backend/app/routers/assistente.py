@@ -2,7 +2,7 @@
 Router do Assistente IA — chat com Claude via SSE streaming.
 """
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -16,15 +16,31 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+@router.get("/status")
+def assistente_status(
+    usuario=Depends(get_usuario_logado),
+    tenant: Tenant = Depends(get_tenant_atual),
+):
+    """Retorna se o tenant tem chave Claude configurada. Usado pelo indicador na sidebar."""
+    svc = TenantConfigService(tenant)
+    return JSONResponse({"conectado": svc.has_llm_api_key()})
+
+
 @router.get("/", response_class=HTMLResponse)
 def assistente_page(
     request: Request,
     usuario=Depends(get_usuario_logado),
     tenant: Tenant = Depends(get_tenant_atual),
 ):
+    svc = TenantConfigService(tenant)
     return templates.TemplateResponse(
         "assistente/chat.html",
-        {"request": request, "usuario": usuario, "tenant": tenant},
+        {
+            "request": request,
+            "usuario": usuario,
+            "tenant": tenant,
+            "ia_conectada": svc.has_llm_api_key(),
+        },
     )
 
 
