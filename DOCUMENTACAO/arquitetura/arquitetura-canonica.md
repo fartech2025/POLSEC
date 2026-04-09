@@ -1,8 +1,7 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 3.7  
-> **Data:** 06/04/2026  
-> **Commit HEAD:** `0f81b05`  
+> **Versão:** 4.1  
+> **Data:** 09/04/2026  
 > **Branch:** `main`
 
 ---
@@ -53,6 +52,9 @@ backend/
 ├── seed_sla.py                   # Migração + seed dos SLAs padrão
 ├── criar_usuarios_teste.py       # Script de seed de usuários de teste
 ├── importar_patrimonio.py        # Importação da planilha FOR IE02 para o banco
+├── importar_chamados.py          # Importação histórica de chamados (XLSX)
+├── importar_faturamento_real.py  # Importação histórica de faturamento (XLSX)
+├── importar_diesel.py            # Importação histórica de diesel (XLSX)
 ├── requirements.txt
 ├── migrations/
 │   └── 001_sla_configs.sql       # DDL da tabela sla_configs
@@ -76,12 +78,16 @@ backend/
 │   │   ├── chamado.py            # PrioridadeChamado + StatusChamado enums
 │   │   ├── peca.py
 │   │   ├── orcamento.py
-│   │   └── sla.py                # SLAConfig — prazos por tenant + prioridade
+│   │   ├── sla.py                # SLAConfig — prazos por tenant + prioridade
+│   │   ├── glosa.py              # GlosaFaixa + GlosaChamado — penalidade contratual
+│   │   ├── diesel.py             # GastoDiesel — controle de abastecimento
+│   │   └── faturamento.py        # FaturamentoHistorico — fechamentos por unidade/período
 │   ├── routers/                  # Handlers HTTP por domínio
 │   │   ├── auth.py               # Login/logout (Supabase + cookie httponly)
 │   │   ├── dashboard.py          # Redireciona por perfil
 │   │   ├── superadmin.py         # Interface FARTECH (gestão de tenants)
-│   │   ├── admin.py              # Interface Administrador POLSEC
+│   │   ├── admin.py              # Interface Administrador POLSEC (dashboard, chamados,
+│   │   │                         #   funcionários, faturamento, DRE, diesel — via /admin/*)
 │   │   ├── tecnico.py            # Interface Técnico (perfil operador)
 │   │   ├── patrimonio.py
 │   │   ├── movimentacao.py
@@ -91,6 +97,8 @@ backend/
 │   │   ├── funcionario.py
 │   │   ├── peca.py
 │   │   ├── orcamento.py
+│   │   ├── glosa.py              # CRUD de glosas + relatórios
+│   │   ├── diesel.py             # CRUD de gastos diesel
 │   │   ├── assistente.py         # Chat IA (Anthropic Claude)
 │   │   ├── da.py                 # Data Analytics
 │   │   └── tenant.py             # Auto-registro de empresa
@@ -119,11 +127,23 @@ backend/
 │   │   ├── login.html
 │   │   ├── dashboard.html
 │   │   ├── admin/
-│   │   │   ├── chamados.html
+│   │   │   ├── chamados.html          # Gestão de chamados (atribuir, fechar)
+│   │   │   ├── chamados_relatorio.html # Análise SLA (chamados abertos, KPIs, filtros)
 │   │   │   ├── funcionarios.html
 │   │   │   ├── usuarios.html
-│   │   │   ├── sla.html          # Configuração de SLA por prioridade
-│   │   │   └── integracoes.html  # Configuração da chave API Claude por tenant
+│   │   │   ├── sla.html               # Configuração de SLA por prioridade
+│   │   │   ├── integracoes.html       # Configuração da chave API Claude por tenant
+│   │   │   ├── faturamento.html       # Fechamento de faturamento mensal
+│   │   │   ├── faturamento_historico.html
+│   │   │   ├── faturamento_relatorio.html # Relatório anual cross-unidade
+│   │   │   ├── dre.html               # DRE simplificado
+│   │   │   ├── diesel.html            # Lista de abastecimentos
+│   │   │   ├── diesel_form.html       # Novo / editar abastecimento
+│   │   │   ├── glosa.html             # Lista de glosas
+│   │   │   ├── glosa_form.html
+│   │   │   ├── glosa_detalhe.html
+│   │   │   ├── glosa_faixas.html      # Tabela de percentuais por faixa
+│   │   │   └── glosa_relatorio.html
 │   │   ├── tecnico/
 │   │   │   ├── painel.html       # Lista de chamados com badges SLA
 │   │   │   ├── chamado.html      # Detalhe/atualização de chamado
@@ -160,7 +180,11 @@ backend/
 | `chamados` | Ordens de serviço com estado e prioridade |
 | `pecas` | Estoque de peças por filial |
 | `orcamentos` | Orçamentos vinculados a chamados |
-| `sla_configs` | Prazos de SLA por tenant e prioridade (**novo**) |
+| `sla_configs` | Prazos de SLA por tenant e prioridade |
+| `glosa_faixas` | Tabela de percentuais de penalidade por faixa de horas (por tenant) |
+| `glosa_chamados` | Registros de glosa vinculados opcional a chamados |
+| `gastos_diesel` | Controle de abastecimentos de diesel por tenant |
+| `faturamento_historico` | Fechamentos de faturamento por unidade/mês/ano (origem: sistema ou importação) |
 
 ### 4.2 SLAConfig — Prazos Padrão
 
@@ -261,6 +285,20 @@ Dependência FastAPI injetada nos routers
 | `base_tecnico.html` | POLSEC azul claro | Técnico (operador) |
 
 > **Logo:** ambos `base.html` e `base_tecnico.html` exibem a logo POLSEC via URL pública do Supabase Storage (`POLSEC_MARCA_Artboard 1 copy 16.png`) no topo do sidebar, substituindo o texto anterior.
+
+### Sidebar Admin (`base.html`) — Seções
+
+A sidebar do perfil `administrador` é dividida em quatro seções:
+
+| Seção | Itens | Rota base |
+|---|---|---|
+| **Operacional** | Análise SLA, Chamados, Funcionários, Diesel | `/admin/chamados/relatorio`, `/admin/chamados`, `/admin/funcionarios`, `/admin/diesel/` |
+| **Financeiro** | Faturamento, Hist. Faturamento, Relatório Anual, DRE, Glosa | `/admin/faturamento`, `/admin/faturamento/historico`, `/admin/faturamento/relatorio`, `/admin/dre`, `/admin/glosa` |
+| **Sistema** | SLA, Acessos, Integrações IA | `/admin/sla`, `/admin/usuarios`, `/admin/integracoes` |
+| **Inteligência** | Assistente IA, Data Analytics | `/assistente`, `/da` |
+
+> **Active state:** o link "Análise SLA" ativa apenas em `/admin/chamados/relatorio` (exact match).  
+> O link "Chamados" usa `startswith('/admin/chamados') and path != '/admin/chamados/relatorio'`.
 
 ### Fluxo de Redirecionamento por Perfil
 
@@ -645,10 +683,238 @@ O form de login (`login.html`) recebeu `data-no-offline` — nunca é enfileirad
 
 ---
 
+## 20. Análise SLA (`/admin/chamados/relatorio`)
+
+Página exclusiva para o perfil `administrador`. Exibe apenas chamados com status **aberto**.
+
+### Comportamento dos filtros
+
+| Parâmetro | Padrão | Descrição |
+|---|---|---|
+| `mes` | `0` (Todos) | Mês de abertura (0 = sem filtro) |
+| `ano` | `0` (Todos) | Ano de abertura (0 = sem filtro) |
+| `tipo` | `""` (Todos) | `preventiva` ou `corretiva` |
+| `filial_id` | `""` (Todas) | Filtra por filial do patrimônio |
+
+Quando `mes=0` e `ano=0` (padrão), nenhum filtro de data é aplicado — **todos os chamados abertos** do tenant são exibidos (limite 500).
+
+### KPIs exibidos
+
+- Total de chamados abertos
+- Preventivas / Corretivas
+- Tempo médio de chegada do técnico (min)
+- Tempo médio de resolução (h)
+- Quantidade com glosa
+
+### Fix de timezone
+
+Chamados importados de planilhas têm `data_abertura` com timezone UTC, enquanto chamados criados pelo sistema são naive. A função auxiliar `_naive(dt)` normaliza todos os datetimes antes de calcular deltas:
+
+```python
+def _naive(dt):
+    if dt is None: return None
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
+```
+
+### Performance
+
+Query usa `joinedload` para todos os relacionamentos acessados no template (`patrimonio`, `solicitante`, `tecnico`, `glosas`) — evita N+1 mesmo com 400+ registros.
+
+---
+
+## 21. Módulo Glosa (`/admin/glosa`)
+
+Controle de penalidade contratual por indisponibilidade de serviço.
+
+### Modelos
+
+| Modelo | Tabela | Descrição |
+|---|---|---|
+| `GlosaFaixa` | `glosa_faixas` | Percentuais por faixa de horas (configurável por tenant) |
+| `GlosaChamado` | `glosa_chamados` | Registro individual de penalidade |
+
+### Faixas padrão POLSEC
+
+| Faixa (h) | Penalidade |
+|---|---|
+| 1 – 24 h | 2% |
+| 24 – 60 h | 4% |
+| 60 – 168 h | 8% |
+| 168 – 240 h | 16% |
+| > 240 h | 32% |
+
+### StatusGlosa
+
+`ativa` → `encerrada` | `contestada` | `cancelada`
+
+### Rotas
+
+| Rota | Descrição |
+|---|---|
+| `GET /admin/glosa` | Lista de glosas com filtros mes/ano/status |
+| `GET /admin/glosa/novo` | Formulário de registro de nova glosa |
+| `POST /admin/glosa` | Salvar nova glosa |
+| `GET /admin/glosa/{id}` | Detalhe da glosa |
+| `POST /admin/glosa/{id}/encerrar` | Encerrar + calcular valor |
+| `GET /admin/glosa/faixas` | Configurar tabela de percentuais |
+| `GET /admin/glosa/relatorio` | Relatório consolidado por período |
+
+### Relacionamento com Chamado
+
+`Chamado.glosas` → `GlosaChamado` (back_populates em ambos os modelos). Um chamado pode ter N glosas. Glosa pode existir sem chamado (lançamento manual retroativo — `chamado_id` nullable).
+
+---
+
+## 22. Módulo Diesel (`/admin/diesel/`)
+
+Controle de abastecimentos de óleo diesel por tenant.
+
+### Modelo
+
+`GastoDiesel` → tabela `gastos_diesel`
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `data` | DateTime | Data do abastecimento |
+| `numero_nota` | Integer, nullable | Número do registro na planilha |
+| `descricao` | String(300) | Ex: "Abastecimento Óleo Diesel - Limeira" |
+| `local` | String(150) | Unidade/local extraído |
+| `tecnico` | String(150) | Motorista / responsável |
+| `litros` | Numeric(10,3) | Quantidade |
+| `valor_litro` | Numeric(8,3) | Preço por litro |
+| `valor_total` | Numeric(12,2) | Valor total pago |
+
+### Formulário inteligente
+
+No form de novo/editar abastecimento (`diesel_form.html`):
+- Campo `local` é um `<select>` populado com as filiais ativas do tenant
+- Opção "Outro…" revela um campo de texto livre
+- Ao selecionar uma filial, a `descricao` é auto-preenchida como `"Abastecimento Óleo Diesel - [Nome da Filial]"` (editável)
+- O valor do select é carregado via campo hidden `localHidden` no POST
+
+### Rotas
+
+| Rota | Descrição |
+|---|---|
+| `GET /admin/diesel/` | Lista com filtros mes/ano |
+| `GET /admin/diesel/novo` | Formulário novo |
+| `POST /admin/diesel/novo` | Salvar |
+| `GET /admin/diesel/{id}/editar` | Formulário edição |
+| `POST /admin/diesel/{id}/editar` | Atualizar |
+| `POST /admin/diesel/{id}/excluir` | Excluir |
+
+### Script de importação
+
+```bash
+PYTHONPATH=. .venv/bin/python3 importar_diesel.py "<arquivo.xlsx>" --tenant polsec
+```
+
+---
+
+## 23. Módulo Faturamento (`/admin/faturamento`)
+
+Fechamento mensal de faturamento por unidade/filial.
+
+### Modelo
+
+`FaturamentoHistorico` → tabela `faturamento_historico`
+
+Restrição de unicidade: `(tenant_id, filial_nome, mes, ano, origem)` — impede duplicatas por período.
+
+| Campo | Descrição |
+|---|---|
+| `filial_nome` | Snapshot do nome (preservado mesmo que a filial seja renomeada) |
+| `chamados_count` | Quantidade de chamados no período |
+| `valor_mao_obra` | Valor de mão de obra |
+| `valor_pecas` | Valor de peças |
+| `valor_total` | Total cobrado |
+| `origem` | `"sistema"` (fechamento manual) ou `"importacao"` (xlsx legado) |
+
+### Rotas
+
+| Rota | Descrição |
+|---|---|
+| `GET /admin/faturamento` | Fechamento mensal atual — lista unidades com valores |
+| `GET /admin/faturamento/historico` | Histórico de todos os fechamentos |
+| `GET /admin/faturamento/relatorio` | Relatório anual cross-unidade (tabela pivô) |
+| `GET /admin/dre` | DRE simplificado (receitas vs despesas) |
+
+### Script de importação
+
+```bash
+PYTHONPATH=. .venv/bin/python3 importar_faturamento_real.py "<FATURAMENTO.xlsx>" --tenant polsec
+```
+
+**Saída:** relatório com `[INS]` / `[UPD]` / `[IGN]` por ABA da planilha.
+
+---
+
+## 24. Scripts de Importação de Dados Históricos
+
+| Script | Fonte | O que importa |
+|---|---|---|
+| `importar_patrimonio.py` | `.numbers` (FOR IE02) | Patrimônios — idempotente por código |
+| `importar_chamados.py` | `.xlsx` (Controle SP) | Chamados históricos — idempotente por número |
+| `importar_faturamento_real.py` | `.xlsx` (FATURAMENTO) | Faturamento histórico por unidade/mês |
+| `importar_diesel.py` | `.xlsx` (Diesel) | Abastecimentos históricos |
+
+Todos os scripts são **idempotentes** — re-execuções ignoram registros já existentes sem sobrescrever.
+
+---
+
+## 25. Dashboard (`/dashboard`)
+
+Acessado por `administrador` e `visualizador`. Superadmin redireciona para `/superadmin`, operador para `/tecnico`.
+
+### Variáveis injetadas pelo `dashboard.py`
+
+| Variável | Tipo | Descrição |
+|---|---|---|
+| `total` | int | Total de patrimônios do tenant |
+| `status_map` | dict | Contagens por status: `ativo`, `manutencao`, `baixado`, `extraviado` |
+| `por_setor` | list[tuple] | Top 10 setores por quantidade (nome, qty) |
+| `fat_total_hist` | float | Soma histórica de faturamento (todas as origens) |
+| `ultimo_fat` | Row\|None | Último mês fechado: `.mes`, `.ano`, `.total`, `.unidades` |
+| `chamados_abertos` | int | Chamados com status `aberto` |
+| `chamados_em_atendimento` | int | Chamados com status `em_atendimento` |
+| `total_filiais` | int | Filiais ativas do tenant |
+| `glosa_ativas` | int | Glosas com status `ativa` |
+| `glosa_valor_mes` | float | Valor de glosas encerradas no mês corrente |
+| `preventivas_abertas` | int | Chamados preventivos em aberto ou em atendimento |
+| `diesel_valor_mes` | float | Soma de `GastoDiesel.valor_total` no mês corrente |
+| `can_edit` | bool | `False` para perfil `visualizador` |
+
+### Layout atual — `dashboard.html`
+
+| Bloco | Conteúdo |
+|---|---|
+| KPI cards (linha 1) | Total de bens · Ativos · Em Manutenção · Extraviados |
+| Bens por Setor | Gráfico de barras horizontais — top 10 setores |
+| Distribuição por Status | Lista com badges coloridos por status |
+
+> **Pendente de implementação (design aprovado 09/04/2026):**  
+> Reorganizar `dashboard.html` em três seções com separadores visuais:
+> - **Financeiro** — Faturamento histórico, último fechamento, Diesel/mês, Glosa ativas
+> - **Operacional** — Chamados em aberto, concluídos no mês, preventivas, unidades
+> - **SLA** — Violados, em risco (80–99%), no prazo, % conformidade, tempo médio de resolução
+>
+> O `dashboard.py` já injeta todas as variáveis necessárias para esse layout.  
+> Blocos "Bens por Setor" e "Status do Acervo" serão removidos do template.
+
+---
+
 ## 14. Histórico de Commits Relevantes
 
 | Commit | Descrição |
 |---|---|
+| *(v4.1)* | docs: arquitetura canônica v4.1 — seção Dashboard (variáveis, layout atual, redesign pendente) |
+| `32e6c57` | docs: arquitetura canônica v3.7 → v4.0 |
+| *(v4.0)* | Análise SLA: filtro todos os períodos por padrão, apenas chamados abertos, joinedload glosas, fix timezone naive/aware |
+| *(v4.0)* | Sidebar admin reorganizada: Operacional / Financeiro / Sistema / Inteligência |
+| *(v4.0)* | Módulo Diesel: form inteligente com select filial + auto-descrição |
+| *(v4.0)* | Módulo Glosa: GlosaFaixa + GlosaChamado, faixas padrão POLSEC |
+| *(v4.0)* | Módulo Faturamento + DRE: fechamento mensal, histórico, relatório anual |
+| *(v4.0)* | Scripts de importação histórica: chamados, faturamento, diesel |
 | `0f81b05` | feat: indicador visual de status da IA (dot verde/vermelho na sidebar + ícone no chat) |
 | `bd29b9e` | feat: admin configura chave Claude via interface web — TenantConfigService + Fernet |
 | `9fb140e` | security: hardening nível bancário — SecurityHeaders, RateLimit, auditoria diária, OWASP fixes |
