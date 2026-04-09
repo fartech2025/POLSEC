@@ -1,6 +1,6 @@
 # Arquitetura Canônica — Sistema Patrimonial POLSEC/FARTECH
 
-> **Versão:** 4.1  
+> **Versão:** 4.2  
 > **Data:** 09/04/2026  
 > **Branch:** `main`
 
@@ -41,6 +41,9 @@ Anthropic Claude (Assistente IA)
 | IA | Anthropic Claude | API |
 | Criptografia | cryptography (Fernet / AES-128-CBC) | ≥42.0.0 |
 | Validação settings | pydantic-settings | — |
+| Container | Docker | 24+ |
+| Orquestração local | Docker Compose | v2 |
+| Automação | Make | — |
 
 ---
 
@@ -48,7 +51,11 @@ Anthropic Claude (Assistente IA)
 
 ```
 backend/
-├── run.py                        # Entry point: uvicorn com reload
+├── Dockerfile                    # Multi-stage build (builder + runtime, non-root app:app)
+├── docker-compose.yml            # Dev: hot-reload, bind mount app/, env_file .env
+├── Makefile                      # Atalhos: install, dev, up, build, migrate, seed, gen-key, audit
+├── README.md                     # Documentação pública do projeto
+├── run.py                        # Entry point: uvicorn; reload=settings.DEBUG (não fixo)
 ├── seed_sla.py                   # Migração + seed dos SLAs padrão
 ├── criar_usuarios_teste.py       # Script de seed de usuários de teste
 ├── importar_patrimonio.py        # Importação da planilha FOR IE02 para o banco
@@ -57,7 +64,10 @@ backend/
 ├── importar_diesel.py            # Importação histórica de diesel (XLSX)
 ├── requirements.txt
 ├── migrations/
-│   └── 001_sla_configs.sql       # DDL da tabela sla_configs
+│   ├── 001_sla_configs.sql       # DDL da tabela sla_configs
+│   ├── 002_faturamento_historico.sql  # DDL tabela faturamento_historico + índices
+│   ├── 003_glosa_chamados.sql    # DDL glosa_faixas + glosa_chamados + colunas SLA em chamados
+│   └── 004_diesel.sql            # DDL tabela gastos_diesel + índices
 ├── app/
 │   ├── main.py                   # Criação do app FastAPI, routers, middleware
 │   ├── config.py                 # Settings via pydantic-settings (.env)
@@ -83,6 +93,7 @@ backend/
 │   │   ├── diesel.py             # GastoDiesel — controle de abastecimento
 │   │   └── faturamento.py        # FaturamentoHistorico — fechamentos por unidade/período
 │   ├── routers/                  # Handlers HTTP por domínio
+│   │   ├── _shared.py            # Helpers compartilhados: exigir_admin(), brl() formatador BRL
 │   │   ├── auth.py               # Login/logout (Supabase + cookie httponly)
 │   │   ├── dashboard.py          # Redireciona por perfil
 │   │   ├── superadmin.py         # Interface FARTECH (gestão de tenants)
@@ -1113,20 +1124,39 @@ localStorage.removeItem('polsec_onboarding_v1_administrador')
 ## 19. Comandos de Operação
 
 ```bash
-# Iniciar servidor
-cd SISTEMA-PATRIMONIAL/backend && source .venv/bin/activate && python run.py
+# ── Setup inicial ────────────────────────────────────────────────────────────
+cd SISTEMA-PATRIMONIAL/backend
+cp .env.example .env            # copiar e preencher variáveis
+make install                    # cria .venv + pip install -r requirements.txt
 
-# Gerar nova SECRET_KEY (Fernet)
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# ── Desenvolvimento local ─────────────────────────────────────────────────────
+make dev                        # uvicorn com hot-reload (DEBUG=true no .env)
+# equivalente manual:
+source .venv/bin/activate && python run.py
 
-# Executar auditoria de segurança manualmente
-python -m app.security.audit
+# ── Docker ───────────────────────────────────────────────────────────────────
+make up                         # docker compose up --build (dev com bind mount)
+make build                      # docker build imagem de produção polsec-api:latest
+make down                       # para containers
+make logs                       # docker compose logs -f api
+make shell                      # bash dentro do container
 
-# Importar planilha patrimonial (dry-run)
-python importar_patrimonio.py --dry-run
+# ── Banco de dados ────────────────────────────────────────────────────────────
+make migrate                    # aplica todos os migrations/0*.sql
+make seed                       # popula SLAs padrão (seed_sla.py)
+make seed-users                 # cria usuários de teste (criar_usuarios_teste.py)
 
-# Importar planilha patrimonial (real)
-python importar_patrimonio.py
+# ── Segurança ─────────────────────────────────────────────────────────────────
+make gen-key                    # gera nova SECRET_KEY Fernet
+make audit                      # auditoria de segurança manual
+python -m app.security.audit    # alternativa direta
+
+# ── Importação de dados históricos ───────────────────────────────────────────
+PYTHONPATH=. .venv/bin/python3 importar_patrimonio.py --dry-run
+PYTHONPATH=. .venv/bin/python3 importar_patrimonio.py
+PYTHONPATH=. .venv/bin/python3 importar_chamados.py "arquivo.xlsx" --tenant polsec
+PYTHONPATH=. .venv/bin/python3 importar_faturamento_real.py "FATURAMENTO.xlsx" --tenant polsec
+PYTHONPATH=. .venv/bin/python3 importar_diesel.py "diesel.xlsx" --tenant polsec
 ```
 
 ### Conteúdo por Perfil
@@ -1145,3 +1175,94 @@ python importar_patrimonio.py
 - Fecha ao clicar no backdrop
 - Sem dependência de Bootstrap Modal (DOM próprio, z-index 1055)
 - Compatível com PWA (funciona offline, assets já cacheados pelo SW)
+
+---
+
+## 26. Infraestrutura e Deploy (Docker)
+
+### Dockerfile (multi-stage)
+
+| Stage | Base | Responsabilidade |
+|---|---|---|
+| `builder` | `python:3.12-slim` | Instala dependências de compilação + gera wheels |
+| `runtime` | `python:3.12-slim` | Copia apenas as wheels, sem ferramentas de build |
+
+Características adicionais:
+- Usuário não-root `app:app` (UID 1001) — nunca roda como root
+- `WORKDIR /app`
+- Healthcheck: `curl http://localhost:8000/health` a cada 30s
+- CMD de produção: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --no-access-log`
+- Arquivos desnecessários em produção são removidos do stage final (scripts de importação, *.md, tests/)
+
+### docker-compose.yml (desenvolvimento)
+
+```yaml
+# executar com: docker compose up --build
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    volumes:
+      - ./app:/app/app   # hot-reload: qualquer mudança em app/ recarrega
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      retries: 3
+```
+
+> O `docker-compose.yml` é **somente para desenvolvimento local**. Em produção, use a imagem built com `make build`.
+
+### Makefile — Referência de Comandos
+
+| Comando | Ação |
+|---|---|
+| `make install` | `python3 -m venv .venv && pip install -r requirements.txt` |
+| `make dev` | `python run.py` (hot-reload quando `DEBUG=true`) |
+| `make up` | `docker compose up --build` |
+| `make down` | `docker compose down` |
+| `make build` | `docker build --target runtime -t polsec-api:latest .` |
+| `make logs` | `docker compose logs -f api` |
+| `make shell` | `docker compose exec api /bin/bash` |
+| `make migrate` | Aplica todos os SQLs em `migrations/0*.sql` via SQLAlchemy AUTOCOMMIT |
+| `make seed` | `python seed_sla.py` |
+| `make seed-users` | `python criar_usuarios_teste.py` |
+| `make gen-key` | Gera nova `SECRET_KEY` Fernet |
+| `make audit` | Auditoria de segurança manual |
+
+### Endpoint de Health Check
+
+```
+GET /health
+Response: {"status": "ok", "version": "2.0.0"}
+HTTP 200
+```
+
+Implementado em `app/main.py` com `include_in_schema=False` (não aparece no OpenAPI).  
+Usado pelo Dockerfile healthcheck e por load balancers externos.
+
+### Pré-requisitos de Produção
+
+1. Banco Supabase criado e schema aplicado (`supabase_schema.sql`)
+2. Migrations aplicadas (`make migrate`)
+3. `.env` preenchido com todas as variáveis (ver seção 10)
+4. `SECRET_KEY` gerada com Fernet (`make gen-key`)
+5. Docker 24+ instalado
+
+### Guia de Deploy Rápido
+
+```bash
+# 1. Clonar e entrar na pasta
+git clone https://github.com/fartech2025/POLSEC.git
+cd POLSEC/SISTEMA-PATRIMONIAL/backend
+
+# 2. Configurar ambiente
+cp .env.example .env
+# → editar .env com credenciais Supabase, ANTHROPIC_API_KEY, SECRET_KEY
+
+# 3. Build e iniciar
+make build
+docker run --env-file .env -p 8000:8000 polsec-api:latest
+# → acesse http://localhost:8000
+```
