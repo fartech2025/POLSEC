@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Relatório Anual de Faturamento — {{ ano }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-table me-2 text-primary"></i>Relatório Anual de Faturamento
+  </h4>
+  <div class="d-flex gap-2">
+    <a href="/admin/faturamento/historico?ano={{ ano }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-clock-history me-1"></i>Histórico
+    </a>
+    <a href="/admin/faturamento" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-receipt me-1"></i>Faturamento
+    </a>
+    <button class="btn btn-outline-dark btn-sm" onclick="window.print()">
+      <i class="bi bi-printer me-1"></i>Imprimir / PDF
+    </button>
+  </div>
+</div>
+
+<!-- Filtro de ano -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-2">
+    <form method="GET" action="/admin/faturamento/relatorio" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Exercício (Ano)</label>
+        <select name="ano" class="form-select form-select-sm">
+          {% for a in anos_disponiveis %}
+          <option value="{{ a }}" {% if ano == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Filtrar
+        </button>
+      </div>
+      <div class="col ms-auto text-end">
+        <small class="text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          Prioridade: <span class="badge bg-success">Sistema</span> sobre
+          <span class="badge bg-warning text-dark">Importado</span> quando há dados nos dois períodos.
+        </small>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if not linhas %}
+<!-- Estado vazio -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+    Nenhum faturamento fechado em <strong>{{ ano }}</strong>.<br>
+    <small>
+      Acesse <a href="/admin/faturamento">Faturamento</a> para fechar um período
+      ou <a href="/admin/faturamento/historico">Histórico</a> para importar dados de planilha.
+    </small>
+  </div>
+</div>
+{% else %}
+
+<!-- KPIs resumo anual -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-secondary">{{ total_anual_chamados }}</div>
+        <div class="text-muted small">Chamados no Ano</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-4 fw-bold text-success">R$ {{ total_anual_valor | brl }}</div>
+        <div class="text-muted small">Total Anual Faturado</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center h-100">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-primary">{{ linhas | length }}</div>
+        <div class="text-muted small">Unidades com Dados</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center h-100">
+      <div class="card-body py-3">
+        {% if total_anual_chamados > 0 %}
+        <div class="fs-4 fw-bold" style="color:#6f42c1;">
+          R$ {{ (total_anual_valor / total_anual_chamados) | brl }}
+        </div>
+        {% else %}
+        <div class="fs-4 fw-bold text-muted">—</div>
+        {% endif %}
+        <div class="text-muted small">Ticket Médio (anual)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================
+     MATRIZ: Unidades × Meses
+     ==================================================================== -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-grid-3x3 me-2 text-primary"></i>
+      Faturamento Total por Unidade × Mês — {{ ano }}
+    </h6>
+    <small class="text-muted">Valores em R$</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm mb-0 align-middle relatorio-matriz">
+        <thead class="table-dark">
+          <tr>
+            <th class="ps-3" style="min-width:200px">Unidade</th>
+            {% for m in range(1, 13) %}
+            <th class="text-center
+              {% if m in meses_com_dados %}text-white{% else %}text-secondary{% endif %}"
+              style="min-width:90px; font-size:.78rem;">
+              {{ meses[m][:3] }}
+            </th>
+            {% endfor %}
+            <th class="text-end pe-3 text-warning">ANUAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+          <tr>
+            <td class="ps-3 fw-semibold" style="font-size:.85rem;">{{ linha.nome }}</td>
+            {% for dado in linha.meses %}
+            <td class="text-end" style="font-size:.8rem;">
+              {% if dado %}
+                <span class="d-block">{{ dado.total | brl }}</span>
+                <small class="text-muted" style="font-size:.7rem;">
+                  {{ dado.chamados }}ch
+                  {% if dado.origem == 'importacao' %}
+                  <i class="bi bi-file-earmark-excel text-warning" title="Importado"></i>
+                  {% endif %}
+                </small>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td class="text-end pe-3 fw-bold text-success" style="font-size:.85rem;">
+              {{ linha.total_valor | brl }}
+              <br>
+              <small class="text-muted fw-normal" style="font-size:.7rem;">{{ linha.total_chamados }} ch</small>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-secondary">
+          <tr class="fw-bold">
+            <td class="ps-3">TOTAL MÊS</td>
+            {% for t in totais_mes %}
+            <td class="text-end" style="font-size:.8rem;">
+              {% if t.total > 0 %}
+                {{ t.total | brl }}
+                <br>
+                <small class="fw-normal text-muted" style="font-size:.7rem;">{{ t.chamados }}ch</small>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td class="text-end pe-3 text-success fw-bold">
+              {{ total_anual_valor | brl }}
+              <br>
+              <small class="fw-normal text-muted" style="font-size:.7rem;">{{ total_anual_chamados }} ch</small>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================
+     DETALHAMENTO: Mão de Obra × Peças por Unidade
+     ==================================================================== -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom py-2">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-bar-chart-steps me-2 text-primary"></i>
+      Composição por Unidade — {{ ano }}
+    </h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Unidade</th>
+            <th class="text-center">Chamados</th>
+            <th class="text-end">Mão de Obra</th>
+            <th class="text-end">Peças / Mat.</th>
+            <th class="text-end">Total Anual</th>
+            <th class="text-end pe-3">Ticket Médio</th>
+            <th class="text-center pe-3">% do Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas | sort(attribute='total_valor', reverse=True) %}
+          {% set pct = (linha.total_valor / total_anual_valor * 100) if total_anual_valor > 0 else 0 %}
+          {% set total_mao = namespace(v=0) %}
+          {% set total_pec = namespace(v=0) %}
+          {% for d in linha.meses if d %}
+            {% set total_mao.v = total_mao.v + d.mao_obra %}
+            {% set total_pec.v = total_pec.v + d.pecas %}
+          {% endfor %}
+          <tr>
+            <td class="ps-3 fw-semibold" style="font-size:.85rem;">{{ linha.nome }}</td>
+            <td class="text-center">
+              <span class="badge bg-secondary rounded-pill">{{ linha.total_chamados }}</span>
+            </td>
+            <td class="text-end">R$ {{ total_mao.v | brl }}</td>
+            <td class="text-end">R$ {{ total_pec.v | brl }}</td>
+            <td class="text-end fw-semibold text-success">R$ {{ linha.total_valor | brl }}</td>
+            <td class="text-end pe-3">
+              {% if linha.total_chamados > 0 %}
+                R$ {{ linha.ticket_medio | brl }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center pe-3">
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:6px;">
+                  <div class="progress-bar bg-success" style="width:{{ pct | round(1) }}%"></div>
+                </div>
+                <small class="text-muted" style="width:36px;">{{ pct | round(1) }}%</small>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-bold border-top border-2">
+          <tr>
+            <td class="ps-3">TOTAL ANUAL</td>
+            <td class="text-center">{{ total_anual_chamados }}</td>
+            <td class="text-end">
+              {%- set soma_mao = namespace(v=0) -%}
+              {%- for l in linhas -%}{%- for d in l.meses if d -%}
+                {%- set soma_mao.v = soma_mao.v + d.mao_obra -%}
+              {%- endfor -%}{%- endfor -%}
+              R$ {{ soma_mao.v | brl }}
+            </td>
+            <td class="text-end">
+              {%- set soma_pec = namespace(v=0) -%}
+              {%- for l in linhas -%}{%- for d in l.meses if d -%}
+                {%- set soma_pec.v = soma_pec.v + d.pecas -%}
+              {%- endfor -%}{%- endfor -%}
+              R$ {{ soma_pec.v | brl }}
+            </td>
+            <td class="text-end text-success">R$ {{ total_anual_valor | brl }}</td>
+            <td class="text-end pe-3">
+              {% if total_anual_chamados > 0 %}
+                R$ {{ (total_anual_valor / total_anual_chamados) | brl }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center pe-3">100%</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================
+     EVOLUÇÃO MENSAL — totais do tenant
+     ==================================================================== -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom py-2">
+    <h6 class="mb-0 fw-semibold">
+      <i class="bi bi-graph-up me-2 text-success"></i>
+      Evolução Mensal — {{ ano }}
+    </h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Mês</th>
+            <th class="text-center">Chamados</th>
+            <th class="text-end">Total Faturado</th>
+            <th class="text-end pe-3">Variação vs. Mês Anterior</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set prev_total = namespace(v=None) %}
+          {% for m_idx in range(12) %}
+          {% set t = totais_mes[m_idx] %}
+          {% set mes_num = m_idx + 1 %}
+          {% if t.total > 0 or mes_num in meses_com_dados %}
+          <tr {% if t.total == 0 %}class="text-muted"{% endif %}>
+            <td class="ps-3 fw-semibold">{{ meses[mes_num] }}/{{ ano }}</td>
+            <td class="text-center">
+              {% if t.chamados > 0 %}
+                <span class="badge bg-secondary rounded-pill">{{ t.chamados }}</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-end">
+              {% if t.total > 0 %}R$ {{ t.total | brl }}
+              {% else %}<span class="text-muted">Sem dados</span>{% endif %}
+            </td>
+            <td class="text-end pe-3">
+              {% if t.total > 0 and prev_total.v is not none and prev_total.v > 0 %}
+                {% set variacao = ((t.total - prev_total.v) / prev_total.v * 100) %}
+                {% if variacao > 0 %}
+                  <span class="text-success fw-semibold">
+                    <i class="bi bi-arrow-up-short"></i>+{{ variacao | round(1) }}%
+                  </span>
+                {% elif variacao < 0 %}
+                  <span class="text-danger fw-semibold">
+                    <i class="bi bi-arrow-down-short"></i>{{ variacao | round(1) }}%
+                  </span>
+                {% else %}
+                  <span class="text-muted">= 0%</span>
+                {% endif %}
+              {% elif t.total > 0 and (prev_total.v is none or prev_total.v == 0) %}
+                <span class="text-muted small">Primeiro mês</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+              {% if t.total > 0 %}{% set prev_total.v = t.total %}{% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Rodapé do relatório -->
+<div class="d-flex justify-content-between text-muted small mt-3 mb-2">
+  <span>
+    <i class="bi bi-calendar3 me-1"></i>Exercício {{ ano }} · {{ tenant.nome }}
+  </span>
+  <span>
+    Gerado em {{ "now" | replace("now", "") }}
+    <i class="bi bi-printer ms-2 d-print-none" role="button" onclick="window.print()" title="Imprimir"></i>
+  </span>
+</div>
+
+{% endif %}{# /if linhas #}
+
+<!-- Estilos de impressão -->
+<style>
+@media print {
+  #sidebar, .btn, form, .nav, .alert, .d-print-none { display: none !important; }
+  .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+  body { font-size: 11px; }
+  .table-dark thead { background: #333 !important; -webkit-print-color-adjust: exact; }
+  .progress { display: none; }
+  h4 { font-size: 16px; }
+  .relatorio-matriz th, .relatorio-matriz td { font-size: 10px !important; padding: 2px 4px; }
+}
+</style>
+{% endblock %}

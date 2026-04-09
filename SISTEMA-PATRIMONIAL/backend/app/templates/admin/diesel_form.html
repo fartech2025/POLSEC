@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}{% if registro %}Editar Diesel #{{ registro.id }}{% else %}Novo Registro de Diesel{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4 gap-3">
+  <a href="/admin/diesel/" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-fuel-pump me-2 text-warning"></i>
+    {% if registro %}Editar Abastecimento{% else %}Novo Abastecimento{% endif %}
+  </h4>
+</div>
+
+{% if erro %}
+<div class="alert alert-danger py-2 mb-3">
+  <i class="bi bi-exclamation-triangle me-2"></i>{{ erro }}
+</div>
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST"
+              action="{% if registro %}/admin/diesel/{{ registro.id }}/editar{% else %}/admin/diesel/novo{% endif %}">
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Data <span class="text-danger">*</span></label>
+              <input type="date" name="data" class="form-control"
+                     value="{{ (registro.data.strftime('%Y-%m-%d') if registro and registro.data else '') }}"
+                     required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Nº da Nota</label>
+              <input type="number" name="numero_nota" class="form-control"
+                     value="{{ registro.numero_nota if registro else '' }}"
+                     placeholder="Ex: 1234">
+            </div>
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">Local / Unidade <span class="text-danger">*</span></label>
+              {% set local_val = registro.local if registro else '' %}
+              <select id="selectLocal" class="form-select" required>
+                <option value="">Selecione a unidade…</option>
+                {% for f in filiais %}
+                  {% set loc = f.nome.split(' - ', 1)[1] if ' - ' in f.nome else f.nome %}
+                  <option value="{{ loc }}" {% if local_val == loc %}selected{% endif %}>{{ f.nome }}</option>
+                {% endfor %}
+                <option value="__outro__" {% if local_val and local_val not in filiais|map(attribute='nome')|list and local_val not in (filiais|map(attribute='nome')|map('string')|list) %}selected{% endif %}>Outro…</option>
+              </select>
+              <input type="text" id="localOutro" class="form-control mt-2"
+                     value="{{ local_val }}"
+                     placeholder="Digite o local manualmente"
+                     style="display:none">
+              {# campo que sempre envia o valor correto #}
+              <input type="hidden" id="localHidden" name="local" value="{{ local_val }}">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label fw-semibold">Descrição</label>
+              <input type="text" id="descricaoInput" name="descricao" class="form-control"
+                     value="{{ registro.descricao if registro else '' }}"
+                     placeholder="Preenchido automaticamente ao selecionar a unidade">
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label fw-semibold">Técnico / Motorista</label>
+            <input type="text" name="tecnico" class="form-control"
+                   value="{{ registro.tecnico if registro else '' }}"
+                   placeholder="Nome do motorista">
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Litros <span class="text-danger">*</span></label>
+              <input type="number" name="litros" class="form-control" step="0.01" min="0"
+                     value="{{ registro.litros if registro else '' }}"
+                     placeholder="Ex: 120.50" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">R$ / Litro</label>
+              <input type="number" name="valor_litro" class="form-control" step="0.001" min="0"
+                     value="{{ registro.valor_litro if registro else '' }}"
+                     placeholder="Ex: 6.189">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Total R$ <span class="text-danger">*</span></label>
+              <input type="number" name="valor_total" id="valorTotal" class="form-control" step="0.01" min="0"
+                     value="{{ registro.valor_total if registro else '' }}"
+                     placeholder="Ex: 743.40" required>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="form-label fw-semibold">Observações</label>
+            <textarea name="observacoes" class="form-control" rows="2"
+                      placeholder="Notas adicionais (opcional)">{{ registro.observacoes if registro else '' }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end mt-4">
+            <a href="/admin/diesel/" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-warning text-dark fw-semibold px-4">
+              <i class="bi bi-check-lg me-1"></i>
+              {% if registro %}Salvar Alterações{% else %}Registrar{% endif %}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Select de local / outro ───────────────────────────────────────────────────
+const selectLocal  = document.getElementById('selectLocal');
+const localOutro   = document.getElementById('localOutro');
+const localHidden  = document.getElementById('localHidden');
+const descricaoInp = document.getElementById('descricaoInput');
+
+function syncLocal() {
+  const val = selectLocal.value;
+  if (val === '__outro__') {
+    localOutro.style.display = '';
+    localHidden.value = localOutro.value.trim();
+  } else {
+    localOutro.style.display = 'none';
+    localHidden.value = val;
+    localOutro.value = '';
+  }
+  // Auto-preenche descrição apenas se estiver vazia ou seguir o padrão
+  const desc = descricaoInp.value.trim();
+  const isAutoDesc = !desc || desc.startsWith('Abastecimento Óleo Diesel');
+  const loc = localHidden.value;
+  if (isAutoDesc && loc) {
+    descricaoInp.value = 'Abastecimento Óleo Diesel - ' + loc;
+  } else if (isAutoDesc && !loc) {
+    descricaoInp.value = '';
+  }
+}
+
+selectLocal.addEventListener('change', syncLocal);
+localOutro.addEventListener('input', () => {
+  localHidden.value = localOutro.value.trim();
+  const desc = descricaoInp.value.trim();
+  const isAutoDesc = !desc || desc.startsWith('Abastecimento Óleo Diesel');
+  if (isAutoDesc) {
+    descricaoInp.value = localOutro.value ? 'Abastecimento Óleo Diesel - ' + localOutro.value : '';
+  }
+});
+
+// Inicializa estado ao carregar (edição)
+(function init() {
+  const cur = localHidden.value;
+  if (!cur) return;
+  let found = false;
+  for (const opt of selectLocal.options) {
+    if (opt.value === cur) { opt.selected = true; found = true; break; }
+  }
+  if (!found) {
+    for (const opt of selectLocal.options) {
+      if (opt.value === '__outro__') { opt.selected = true; break; }
+    }
+    localOutro.style.display = '';
+    localOutro.value = cur;
+  }
+})();
+
+// ── Auto-calcular total ────────────────────────────────────────────────────────
+const fLitros = document.querySelector('[name="litros"]');
+const fVlLitro = document.querySelector('[name="valor_litro"]');
+const fTotal = document.getElementById('valorTotal');
+function calcTotal() {
+  const l = parseFloat(fLitros.value) || 0;
+  const v = parseFloat(fVlLitro.value) || 0;
+  if (l > 0 && v > 0) {
+    fTotal.value = (l * v).toFixed(2);
+  }
+}
+fLitros.addEventListener('input', calcTotal);
+fVlLitro.addEventListener('input', calcTotal);
+</script>
+{% endblock %}

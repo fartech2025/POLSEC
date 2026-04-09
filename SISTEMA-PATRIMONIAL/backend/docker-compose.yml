@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      target: builder   # usa stage builder para dev (com dependências extras)
+    image: polsec-api:dev
+    container_name: polsec_api
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      # Hot-reload: monta o código local dentro do container
+      - ./app:/app/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

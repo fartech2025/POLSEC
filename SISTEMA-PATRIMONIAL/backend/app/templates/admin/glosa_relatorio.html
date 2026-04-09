@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Relatório de Glosa{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-bar-chart me-2 text-warning"></i>Relatório de Glosa por Unidade
+  </h4>
+  <div class="d-flex gap-2">
+    <a href="/admin/glosa" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <button onclick="window.print()" class="btn btn-outline-secondary btn-sm d-print-none">
+      <i class="bi bi-printer me-1"></i>Imprimir
+    </button>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4 d-print-none">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <select name="ano" class="form-select form-select-sm">
+          <option value="">Todos os anos</option>
+          {% for a in anos_disponiveis %}
+          <option value="{{ a }}" {% if ano_filtro == a|string %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <select name="mes" class="form-select form-select-sm">
+          <option value="">Todos os meses</option>
+          {% for n, nome in meses %}
+          <option value="{{ n }}" {% if mes_filtro == n|string %}selected{% endif %}>{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+        <a href="/admin/glosa/relatorio/periodo" class="btn btn-outline-secondary btn-sm ms-1">Limpar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Totais -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-danger">{{ total_qtd }}</div>
+        <div class="text-muted small">Total de Glosas</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:#fd7e14">{{ total_horas | round(1) }}h</div>
+        <div class="text-muted small">Horas de Indisponibilidade</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-danger">R$ {{ total_valor | brl }}</div>
+        <div class="text-muted small">Valor Total de Glosa</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabela por unidade -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent fw-semibold">
+    Penalidades por Unidade
+    {% if ano_filtro or mes_filtro %}
+    <span class="text-muted fw-normal small ms-2">
+      {{ meses | selectattr(0, 'equalto', mes_filtro | int) | map(attribute=1) | first if mes_filtro else '' }}
+      {{ ano_filtro }}
+    </span>
+    {% endif %}
+  </div>
+  <div class="card-body p-0">
+    {% if resumo %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Unidade</th>
+            <th class="text-end">Qtd Glosas</th>
+            <th class="text-end">Horas Indisp.</th>
+            <th class="text-end">Valor Penalidade</th>
+            <th class="text-end">% do Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in resumo %}
+          <tr>
+            <td class="text-muted small">{{ loop.index }}</td>
+            <td class="fw-semibold">{{ r.filial_nome }}</td>
+            <td class="text-end">{{ r.qtd }}</td>
+            <td class="text-end">{{ r.horas_total | round(1) }}h</td>
+            <td class="text-end fw-semibold {% if r.valor_total > 0 %}text-danger{% endif %}">
+              {% if r.valor_total > 0 %}R$ {{ r.valor_total | brl }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end">
+              {% if total_valor > 0 %}
+                {{ ((r.valor_total / total_valor) * 100) | round(1) }}%
+                <div class="progress mt-1" style="height:3px">
+                  <div class="progress-bar bg-danger"
+                       style="width:{{ ((r.valor_total / total_valor) * 100) | round(0) }}%"></div>
+                </div>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td colspan="2">Total</td>
+            <td class="text-end">{{ total_qtd }}</td>
+            <td class="text-end">{{ total_horas | round(1) }}h</td>
+            <td class="text-end text-danger">R$ {{ total_valor | brl }}</td>
+            <td class="text-end">100%</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-check-circle fs-1 text-success d-block mb-2"></i>
+      Nenhuma glosa encerrada para o período selecionado.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quadro de faixas de referência -->
+<div class="card border-0 shadow-sm mt-4">
+  <div class="card-header bg-transparent fw-semibold small py-2">
+    <i class="bi bi-table me-1"></i>Quadro de Penalidades Vigente
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0 text-center">
+      <thead class="table-light">
+        <tr><th>Horas de Indisponibilidade</th><th>Penalidade</th></tr>
+      </thead>
+      <tbody>
+        {% for f in faixas %}
+        <tr>
+          <td>{{ f.horas_min }}h
+            {% if f.horas_max %}até {{ f.horas_max }}h{% else %}ou mais{% endif %}
+          </td>
+          <td class="fw-semibold text-danger">{{ f.percentual }}%</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="text-muted">Nenhuma faixa configurada.
+          <a href="/admin/glosa/faixas/seed">Inserir padrão Polsec</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>@media print {
+  .d-print-none { display: none !important; }
+  .sidebar, nav, footer { display: none !important; }
+}</style>
+{% endblock %}

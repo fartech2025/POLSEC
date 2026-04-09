@@ -12,6 +12,11 @@ import anthropic
 from app.config import settings
 from app.models.patrimonio import Patrimonio, StatusPatrimonio
 from app.models.movimentacao import Movimentacao
+from app.models.faturamento import FaturamentoHistorico
+from app.models.chamado import Chamado
+from app.models.filial import Filial
+from app.models.funcionario import Funcionario
+from app.models.orcamento import Orcamento
 
 # ─── Definição das ferramentas Tool-Use ──────────────────────────────────────
 
@@ -88,22 +93,129 @@ FERRAMENTAS = [
             "required": ["codigo"],
         },
     },
+    {
+        "name": "consultar_faturamento",
+        "description": (
+            "Consulta o histórico de faturamento mensal por unidade. "
+            "Use para responder perguntas sobre valores faturados, comparar períodos, "
+            "ver ranking de unidades por faturamento ou buscar uma unidade específica. "
+            "Dados disponíveis: out/2022 até mar/2026 — 31 unidades prisionais (EMTEL)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "unidade": {
+                    "type": "string",
+                    "description": "Nome parcial da unidade/filial para filtrar (ex: 'Franco da Rocha', 'CDP')",
+                },
+                "mes": {
+                    "type": "integer",
+                    "description": "Mês para filtrar (1-12)",
+                },
+                "ano": {
+                    "type": "integer",
+                    "description": "Ano para filtrar (ex: 2025)",
+                },
+                "limite": {
+                    "type": "integer",
+                    "description": "Número máximo de registros a retornar (padrão: 20)",
+                },
+            },
+        },
+    },
+    {
+        "name": "estatisticas_faturamento",
+        "description": (
+            "Retorna estatísticas consolidadas de faturamento: total geral, média mensal, "
+            "ranking das unidades com maior faturamento, evolução por ano e mês com maiores valores. "
+            "Use para perguntas como 'quanto foi faturado no total', 'qual unidade fatura mais', "
+            "'qual foi o melhor mês'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ano": {
+                    "type": "integer",
+                    "description": "Filtrar por ano específico (opcional)",
+                },
+                "top_n": {
+                    "type": "integer",
+                    "description": "Quantas unidades no ranking (padrão: 10)",
+                },
+            },
+        },
+    },
+    {
+        "name": "listar_chamados",
+        "description": (
+            "Lista chamados de manutenção com filtros opcionais. "
+            "Use para perguntas sobre chamados abertos, pendentes, concluídos ou por prioridade."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["aberto", "em_atendimento", "aguardando_pecas", "em_execucao", "concluido", "cancelado", "reaberto"],
+                    "description": "Filtrar por status do chamado",
+                },
+                "prioridade": {
+                    "type": "string",
+                    "enum": ["baixa", "media", "alta", "critica"],
+                    "description": "Filtrar por prioridade",
+                },
+                "limite": {
+                    "type": "integer",
+                    "description": "Número máximo de registros (padrão: 15)",
+                },
+            },
+        },
+    },
+    {
+        "name": "listar_filiais",
+        "description": (
+            "Lista as unidades/filiais cadastradas no sistema. "
+            "Use para saber quantas unidades existem, seus nomes ou para localizar uma unidade específica."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "busca": {
+                    "type": "string",
+                    "description": "Termo para filtrar pelo nome da unidade",
+                },
+            },
+        },
+    },
+    {
+        "name": "resumo_geral",
+        "description": (
+            "Retorna um resumo consolidado de toda a operação: patrimônios, chamados, "
+            "faturamento e unidades. Use como ponto de partida para análises gerais ou "
+            "quando o usuário perguntar sobre o estado geral do sistema."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
 ]
 
-SYSTEM_PROMPT = """Você é o Assistente Digital de Gestão Patrimonial da POLSEC.
-Você tem acesso direto ao sistema de controle patrimonial via ferramentas.
+SYSTEM_PROMPT = """Você é o Assistente Digital de Gestão da POLSEC — sistema integrado de controle patrimonial, manutenção e faturamento de unidades prisionais.
+Você tem acesso direto ao sistema via ferramentas e pode consultar dados em tempo real.
 
-Suas responsabilidades:
-- Responder perguntas sobre o acervo patrimonial
-- Consultar dados em tempo real usando as ferramentas disponíveis
-- Gerar relatórios e análises sobre os bens
-- Sugerir ações baseadas nos dados encontrados
+Capacidades:
+- **Patrimônio**: consultar bens, status (ativo/manutenção/baixado/extraviado), setores, valores, histórico de movimentações
+- **Faturamento**: histórico mensal por unidade (out/2022–mar/2026), totais, ranking, evolução temporal — 31 unidades prisionais, R$ 180 milhões de histórico
+- **Chamados**: manutenções abertas, em andamento, concluídas, por prioridade
+- **Unidades**: 33 filiais cadastradas (unidades prisionais do estado de São Paulo)
+- **Visão geral**: resumo consolidado de toda a operação
 
 Diretrizes:
-- Sempre consulte os dados antes de responder perguntas factuais
-- Seja objetivo e apresente números quando relevante
+- Sempre consulte os dados reais antes de responder perguntas factuais
+- Para perguntas sobre faturamento, use `consultar_faturamento` ou `estatisticas_faturamento`
+- Para visão geral ou quando não souber por onde começar, use `resumo_geral`
+- Apresente valores em reais (R$ 1.234.567,89) com separadores de milhar
+- Seja objetivo: use tabelas e listas quando houver múltiplos itens
 - Use linguagem profissional em português brasileiro
-- Formate listas e tabelas quando houver múltiplos itens"""
+- Ao citar unidades prisionais, use o nome oficial do sistema (ex: CDP SÃO PAULO, PEP I)"""
 
 
 # ─── Execução das ferramentas ─────────────────────────────────────────────────
@@ -118,6 +230,16 @@ def executar_ferramenta(nome: str, argumentos: dict, db: Session, tenant_id: str
         return _listar_movimentacoes(db, tenant_id, **argumentos)
     elif nome == "buscar_patrimonio_por_codigo":
         return _buscar_por_codigo(db, tenant_id, **argumentos)
+    elif nome == "consultar_faturamento":
+        return _consultar_faturamento(db, tenant_id, **argumentos)
+    elif nome == "estatisticas_faturamento":
+        return _estatisticas_faturamento(db, tenant_id, **argumentos)
+    elif nome == "listar_chamados":
+        return _listar_chamados(db, tenant_id, **argumentos)
+    elif nome == "listar_filiais":
+        return _listar_filiais(db, tenant_id, **argumentos)
+    elif nome == "resumo_geral":
+        return _resumo_geral(db, tenant_id)
     return json.dumps({"erro": f"Ferramenta '{nome}' não encontrada"})
 
 
@@ -237,6 +359,264 @@ def _buscar_por_codigo(db: Session, tenant_id: str, codigo: str) -> str:
         ),
         "observacoes": item.observacoes,
         "cadastrado_em": item.created_at.strftime("%d/%m/%Y"),
+    }
+    return json.dumps(resultado, ensure_ascii=False)
+
+
+def _consultar_faturamento(
+    db: Session,
+    tenant_id: str,
+    unidade: str = None,
+    mes: int = None,
+    ano: int = None,
+    limite: int = 20,
+) -> str:
+    query = db.query(FaturamentoHistorico).filter(
+        FaturamentoHistorico.tenant_id == tenant_id
+    )
+    if unidade:
+        query = query.filter(FaturamentoHistorico.filial_nome.ilike(f"%{unidade}%"))
+    if mes:
+        query = query.filter(FaturamentoHistorico.mes == mes)
+    if ano:
+        query = query.filter(FaturamentoHistorico.ano == ano)
+
+    registros = (
+        query.order_by(
+            FaturamentoHistorico.ano.desc(),
+            FaturamentoHistorico.mes.desc(),
+            FaturamentoHistorico.valor_total.desc(),
+        )
+        .limit(limite)
+        .all()
+    )
+    resultado = [
+        {
+            "unidade": r.filial_nome,
+            "periodo": f"{r.mes:02d}/{r.ano}",
+            "valor_total": float(r.valor_total),
+            "valor_mao_obra": float(r.valor_mao_obra),
+            "valor_pecas": float(r.valor_pecas),
+            "chamados_count": r.chamados_count,
+            "origem": r.origem,
+        }
+        for r in registros
+    ]
+    total_registros = query.count()
+    return json.dumps(
+        {"total_registros": total_registros, "retornados": len(resultado), "faturamentos": resultado},
+        ensure_ascii=False,
+    )
+
+
+def _estatisticas_faturamento(
+    db: Session, tenant_id: str, ano: int = None, top_n: int = 10
+) -> str:
+    query_base = db.query(FaturamentoHistorico).filter(
+        FaturamentoHistorico.tenant_id == tenant_id
+    )
+    if ano:
+        query_base = query_base.filter(FaturamentoHistorico.ano == ano)
+
+    total_geral = (
+        db.query(func.sum(FaturamentoHistorico.valor_total))
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+        .scalar() or 0
+    )
+    # Média mensal (soma / número de meses distintos)
+    meses_distintos = (
+        db.query(func.count(func.distinct(
+            func.concat(FaturamentoHistorico.ano, '-', FaturamentoHistorico.mes)
+        )))
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+        .scalar() or 1
+    )
+    # Totais do filtro (se ano especificado)
+    total_filtrado = query_base.with_entities(func.sum(FaturamentoHistorico.valor_total)).scalar() or 0
+
+    # Ranking por unidade
+    ranking_q = (
+        db.query(
+            FaturamentoHistorico.filial_nome,
+            func.sum(FaturamentoHistorico.valor_total).label("total"),
+            func.count(FaturamentoHistorico.id).label("meses"),
+        )
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+    )
+    if ano:
+        ranking_q = ranking_q.filter(FaturamentoHistorico.ano == ano)
+    ranking = (
+        ranking_q
+        .group_by(FaturamentoHistorico.filial_nome)
+        .order_by(func.sum(FaturamentoHistorico.valor_total).desc())
+        .limit(top_n)
+        .all()
+    )
+
+    # Evolução por ano
+    por_ano = (
+        db.query(
+            FaturamentoHistorico.ano,
+            func.sum(FaturamentoHistorico.valor_total).label("total"),
+            func.count(FaturamentoHistorico.id).label("registros"),
+        )
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+        .group_by(FaturamentoHistorico.ano)
+        .order_by(FaturamentoHistorico.ano)
+        .all()
+    )
+
+    # Mês com maior faturamento geral
+    melhor_mes = (
+        db.query(
+            FaturamentoHistorico.mes,
+            FaturamentoHistorico.ano,
+            func.sum(FaturamentoHistorico.valor_total).label("total"),
+        )
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+        .group_by(FaturamentoHistorico.mes, FaturamentoHistorico.ano)
+        .order_by(func.sum(FaturamentoHistorico.valor_total).desc())
+        .first()
+    )
+
+    resultado = {
+        "total_geral_historico": float(total_geral),
+        "total_periodo_filtrado": float(total_filtrado),
+        "media_mensal_historica": float(total_geral / meses_distintos),
+        "total_meses_disponíveis": meses_distintos,
+        "periodo_cobertura": "out/2022 a mar/2026",
+        "melhor_mes": (
+            {"periodo": f"{melhor_mes.mes:02d}/{melhor_mes.ano}", "total": float(melhor_mes.total)}
+            if melhor_mes else None
+        ),
+        "ranking_unidades": [
+            {"unidade": r.filial_nome, "total": float(r.total), "meses": r.meses}
+            for r in ranking
+        ],
+        "evolucao_anual": [
+            {"ano": r.ano, "total": float(r.total), "registros": r.registros}
+            for r in por_ano
+        ],
+    }
+    return json.dumps(resultado, ensure_ascii=False)
+
+
+def _listar_chamados(
+    db: Session,
+    tenant_id: str,
+    status: str = None,
+    prioridade: str = None,
+    limite: int = 15,
+) -> str:
+    query = db.query(Chamado).filter(Chamado.tenant_id == tenant_id)
+    if status:
+        query = query.filter(Chamado.status == status)
+    if prioridade:
+        query = query.filter(Chamado.prioridade == prioridade)
+
+    total = query.count()
+
+    # Contagem por status
+    por_status = (
+        db.query(Chamado.status, func.count(Chamado.id))
+        .filter(Chamado.tenant_id == tenant_id)
+        .group_by(Chamado.status)
+        .all()
+    )
+
+    chamados = (
+        query.order_by(Chamado.created_at.desc()).limit(limite).all()
+    )
+    resultado = {
+        "total_filtrado": total,
+        "por_status": {str(s): c for s, c in por_status},
+        "chamados": [
+            {
+                "id": c.id,
+                "titulo": c.titulo,
+                "status": str(c.status),
+                "prioridade": str(c.prioridade),
+                "aberto_em": c.created_at.strftime("%d/%m/%Y"),
+            }
+            for c in chamados
+        ],
+    }
+    return json.dumps(resultado, ensure_ascii=False)
+
+
+def _listar_filiais(
+    db: Session, tenant_id: str, busca: str = None
+) -> str:
+    query = db.query(Filial).filter(Filial.tenant_id == tenant_id)
+    if busca:
+        query = query.filter(Filial.nome.ilike(f"%{busca}%"))
+    filiais = query.order_by(Filial.nome).all()
+    resultado = {
+        "total": len(filiais),
+        "unidades": [{"id": f.id, "nome": f.nome} for f in filiais],
+    }
+    return json.dumps(resultado, ensure_ascii=False)
+
+
+def _resumo_geral(db: Session, tenant_id: str) -> str:
+    # Patrimônios
+    total_pats = db.query(func.count(Patrimonio.id)).filter(Patrimonio.tenant_id == tenant_id).scalar() or 0
+    pats_ativos = (
+        db.query(func.count(Patrimonio.id))
+        .filter(Patrimonio.tenant_id == tenant_id, Patrimonio.status == StatusPatrimonio.ativo)
+        .scalar() or 0
+    )
+    # Chamados
+    total_chamados = db.query(func.count(Chamado.id)).filter(Chamado.tenant_id == tenant_id).scalar() or 0
+    chamados_abertos = (
+        db.query(func.count(Chamado.id))
+        .filter(Chamado.tenant_id == tenant_id, Chamado.status == "aberto")
+        .scalar() or 0
+    )
+    # Faturamento
+    total_fat = (
+        db.query(func.sum(FaturamentoHistorico.valor_total))
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+        .scalar() or 0
+    )
+    ultimo_mes = (
+        db.query(
+            FaturamentoHistorico.mes,
+            FaturamentoHistorico.ano,
+            func.sum(FaturamentoHistorico.valor_total).label("total"),
+            func.count(FaturamentoHistorico.id).label("unidades"),
+        )
+        .filter(FaturamentoHistorico.tenant_id == tenant_id)
+        .group_by(FaturamentoHistorico.mes, FaturamentoHistorico.ano)
+        .order_by(FaturamentoHistorico.ano.desc(), FaturamentoHistorico.mes.desc())
+        .first()
+    )
+    # Filiais
+    total_filiais = db.query(func.count(Filial.id)).filter(Filial.tenant_id == tenant_id).scalar() or 0
+
+    resultado = {
+        "patrimônios": {
+            "total": total_pats,
+            "ativos": pats_ativos,
+            "em_manutencao_ou_baixados": total_pats - pats_ativos,
+        },
+        "chamados": {
+            "total_historico": total_chamados,
+            "abertos_agora": chamados_abertos,
+        },
+        "faturamento": {
+            "total_historico": float(total_fat),
+            "periodo": "out/2022 a mar/2026",
+            "ultimo_mes_fechado": (
+                {
+                    "periodo": f"{ultimo_mes.mes:02d}/{ultimo_mes.ano}",
+                    "valor": float(ultimo_mes.total),
+                    "unidades": ultimo_mes.unidades,
+                }
+                if ultimo_mes else None
+            ),
+        },
+        "unidades": {"total_filiais": total_filiais},
     }
     return json.dumps(resultado, ensure_ascii=False)
 

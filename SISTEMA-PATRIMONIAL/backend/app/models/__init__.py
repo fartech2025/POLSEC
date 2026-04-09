@@ -12,3 +12,5 @@ from app.models.chamado import Chamado, AnexoChamado
 from app.models.peca import Peca, EstoqueGeral, EstoqueFilial, PecaChamado
 from app.models.orcamento import Orcamento, AprovacaoOrcamento, NotaFiscal
 from app.models.sla import SLAConfig
+from app.models.faturamento import FaturamentoHistorico
+from app.models.glosa import GlosaFaixa, GlosaChamado

@@ -49,7 +49,13 @@
         <span class="sidebar-section-label">Operacional</span>
       </li>
       <li class="nav-item">
-        <a class="nav-link {% if request.url.path.startswith('/admin/chamados') %}active{% endif %}"
+        <a class="nav-link {% if request.url.path == '/admin/chamados/relatorio' %}active{% endif %}"
+           href="/admin/chamados/relatorio">
+          <i class="bi bi-stopwatch me-2"></i><span>Análise SLA</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/chamados') and request.url.path != '/admin/chamados/relatorio' %}active{% endif %}"
            href="/admin/chamados">
           <i class="bi bi-headset me-2"></i><span>Chamados</span>
         </a>
@@ -58,6 +64,47 @@
         <a class="nav-link {% if request.url.path.startswith('/admin/funcionarios') %}active{% endif %}"
            href="/admin/funcionarios">
           <i class="bi bi-people me-2"></i><span>Funcionários</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/diesel') %}active{% endif %}"
+           href="/admin/diesel/">
+          <i class="bi bi-fuel-pump me-2"></i><span>Diesel</span>
+        </a>
+      </li>
+
+      <!-- Seção Financeiro -->
+      <li class="nav-item mt-3 mb-1">
+        <span class="sidebar-section-label">Financeiro</span>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/faturamento') and not request.url.path.startswith('/admin/faturamento/historico') and not request.url.path.startswith('/admin/faturamento/relatorio') %}active{% endif %}"
+           href="/admin/faturamento">
+          <i class="bi bi-receipt me-2"></i><span>Faturamento</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path == '/admin/faturamento/historico' %}active{% endif %}"
+           href="/admin/faturamento/historico">
+          <i class="bi bi-clock-history me-2"></i><span>Hist. Faturamento</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path == '/admin/faturamento/relatorio' %}active{% endif %}"
+           href="/admin/faturamento/relatorio">
+          <i class="bi bi-table me-2"></i><span>Relatório Anual</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/dre') %}active{% endif %}"
+           href="/admin/dre">
+          <i class="bi bi-graph-up-arrow me-2"></i><span>DRE</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.url.path.startswith('/admin/glosa') %}active{% endif %}"
+           href="/admin/glosa">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i><span>Glosa</span>
         </a>
       </li>
       <li class="nav-item mt-3 mb-1">

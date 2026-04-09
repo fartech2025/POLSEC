@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Glosa #{{ glosa.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>
+    Glosa #{{ glosa.id }}
+    {% if glosa.status == 'ativa' %}
+      <span class="badge bg-danger ms-2 fs-6">Ativa</span>
+    {% elif glosa.status == 'encerrada' %}
+      <span class="badge bg-success ms-2 fs-6">Encerrada</span>
+    {% elif glosa.status == 'contestada' %}
+      <span class="badge bg-warning text-dark ms-2 fs-6">Contestada</span>
+    {% else %}
+      <span class="badge bg-secondary ms-2 fs-6">Cancelada</span>
+    {% endif %}
+  </h4>
+  <a href="/admin/glosa" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<div class="row g-4">
+  <!-- Informações principais -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent fw-semibold">Detalhes da Glosa</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4 text-muted small">Unidade</dt>
+          <dd class="col-sm-8 fw-semibold">{{ glosa.filial_nome }}</dd>
+
+          <dt class="col-sm-4 text-muted small">Chamado vinculado</dt>
+          <dd class="col-sm-8">
+            {% if glosa.chamado_id %}
+            <a href="/admin/chamados/{{ glosa.chamado_id }}">#{{ glosa.chamado_id }}</a>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </dd>
+
+          <dt class="col-sm-4 text-muted small">Motivo</dt>
+          <dd class="col-sm-8">{{ glosa.motivo or '—' }}</dd>
+
+          <dt class="col-sm-4 text-muted small">Início</dt>
+          <dd class="col-sm-8">{{ glosa.data_inicio.strftime('%d/%m/%Y %H:%M') if glosa.data_inicio else '—' }}</dd>
+
+          <dt class="col-sm-4 text-muted small">Fim</dt>
+          <dd class="col-sm-8">
+            {% if glosa.data_fim %}
+              {{ glosa.data_fim.strftime('%d/%m/%Y %H:%M') }}
+            {% else %}
+              <span class="text-danger fw-semibold">Em aberto</span>
+            {% endif %}
+          </dd>
+
+          <dt class="col-sm-4 text-muted small">Horas indisponíveis</dt>
+          <dd class="col-sm-8 fw-semibold">
+            {{ (glosa.horas_indisponiveis | float | round(2))|string + 'h' if glosa.horas_indisponiveis else '—' }}
+          </dd>
+
+          <dt class="col-sm-4 text-muted small">Percentual penalidade</dt>
+          <dd class="col-sm-8 fw-semibold text-danger">
+            {{ glosa.percentual_glosa|string + '%' if glosa.percentual_glosa else '—' }}
+          </dd>
+
+          <dt class="col-sm-4 text-muted small">Valor base contrato</dt>
+          <dd class="col-sm-8">
+            {{ 'R$ ' + (glosa.valor_base | brl) if glosa.valor_base else '—' }}
+          </dd>
+
+          <dt class="col-sm-4 text-muted small">Valor da glosa</dt>
+          <dd class="col-sm-8 fw-bold fs-5 text-danger">
+            {{ 'R$ ' + (glosa.valor_glosa | brl) if glosa.valor_glosa else '—' }}
+          </dd>
+
+          <dt class="col-sm-4 text-muted small">Observações</dt>
+          <dd class="col-sm-8">{{ glosa.observacoes or '—' }}</dd>
+
+          <dt class="col-sm-4 text-muted small">Registrado por</dt>
+          <dd class="col-sm-8 small">
+            {{ glosa.registrado_por.nome if glosa.registrado_por else '—' }}
+            · {{ glosa.created_at.strftime('%d/%m/%Y %H:%M') if glosa.created_at }}
+          </dd>
+
+          {% if glosa.encerrado_por %}
+          <dt class="col-sm-4 text-muted small">Encerrado por</dt>
+          <dd class="col-sm-8 small">{{ glosa.encerrado_por.nome }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel de ações -->
+  <div class="col-lg-5">
+    {% if glosa.status == 'ativa' %}
+    <!-- Ação: Encerrar -->
+    <div class="card border-0 shadow-sm mb-3 border-start border-4 border-success">
+      <div class="card-header bg-transparent fw-semibold text-success">
+        <i class="bi bi-check-circle me-1"></i>Encerrar Glosa
+      </div>
+      <div class="card-body">
+        <form method="post" action="/admin/glosa/{{ glosa.id }}/encerrar">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Data/Hora de Fim <span class="text-danger">*</span></label>
+            <input type="datetime-local" name="data_fim" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Observações</label>
+            <textarea name="observacoes" class="form-control form-control-sm" rows="2"
+                      placeholder="Resolução, notas de encerramento…"></textarea>
+          </div>
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Encerrar e Calcular Penalidade
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Ação: Cancelar -->
+    <div class="card border-0 shadow-sm border-start border-4 border-secondary">
+      <div class="card-body py-2">
+        <form method="post" action="/admin/glosa/{{ glosa.id }}/cancelar"
+              onsubmit="return confirm('Confirma cancelamento desta glosa?')">
+          <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+            <i class="bi bi-x-circle me-1"></i>Cancelar Glosa
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Quadro de faixas -->
+    <div class="card border-0 shadow-sm {% if glosa.status == 'ativa' %}mt-3{% endif %}">
+      <div class="card-header bg-transparent fw-semibold small py-2">
+        <i class="bi bi-table me-1"></i>Quadro de Penalidades
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0 text-center">
+          <thead class="table-light">
+            <tr><th>Horas</th><th>%</th></tr>
+          </thead>
+          <tbody>
+            {% for f in faixas %}
+            <tr class="{% if glosa.percentual_glosa and glosa.percentual_glosa == f.percentual %}table-warning fw-bold{% endif %}">
+              <td>{{ f.horas_min }}h
+                {% if f.horas_max %}até {{ f.horas_max }}h{% else %}+{% endif %}
+              </td>
+              <td>{{ f.percentual }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

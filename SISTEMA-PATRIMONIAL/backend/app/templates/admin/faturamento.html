@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Faturamento por Unidades — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-receipt me-2 text-primary"></i>Faturamento por Unidades
+  </h4>
+  <div class="d-flex gap-2">
+    <a href="/admin/faturamento/historico?ano={{ ano }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-clock-history me-1"></i>Ver Histórico
+    </a>
+    <span class="text-muted small align-self-center">{{ tenant.nome }}</span>
+  </div>
+</div>
+
+<!-- Alertas de ação -->
+{% set msg = request.query_params.get('msg', '') %}
+{% if msg == 'fechado' %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-check-circle me-2"></i>Período <strong>{{ meses[mes] }}/{{ ano }}</strong> fechado com sucesso e registrado no histórico.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% elif msg == 'reaberto' %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  <i class="bi bi-unlock me-2"></i>Período <strong>{{ meses[mes] }}/{{ ano }}</strong> reaberto — histórico do sistema removido.
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Banner período fechado -->
+{% if periodo_fechado %}
+<div class="alert alert-info d-flex align-items-center gap-3 mb-3" role="alert">
+  <i class="bi bi-lock-fill fs-4"></i>
+  <div class="flex-grow-1">
+    <strong>Período fechado.</strong> Este faturamento já foi registrado no histórico.
+    Os valores abaixo são calculados em tempo real e podem diferir do histórico salvo.
+  </div>
+  <form method="POST" action="/admin/faturamento/reabrir" class="mb-0"
+        onsubmit="return confirm('Remover o histórico salvo de {{ meses[mes] }}/{{ ano }}? Você poderá re-fechar.')">
+    <input type="hidden" name="mes" value="{{ mes }}">
+    <input type="hidden" name="ano" value="{{ ano }}">
+    <button class="btn btn-outline-warning btn-sm text-nowrap">
+      <i class="bi bi-unlock me-1"></i>Reabrir
+    </button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Filtro de período -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-2">
+    <form method="GET" action="/admin/faturamento" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Mês</label>
+        <select name="mes" class="form-select form-select-sm">
+          {% for num, nome in meses.items() %}
+          <option value="{{ num }}" {% if mes == num %}selected{% endif %}>{{ nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Ano</label>
+        <select name="ano" class="form-select form-select-sm">
+          {% for a in anos_disponiveis %}
+          <option value="{{ a }}" {% if ano == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Filtrar
+        </button>
+      </div>
+      <div class="col-md-auto ms-auto text-end">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+          <i class="bi bi-printer me-1"></i>Imprimir
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- KPIs do período -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-secondary">{{ total_geral.chamados }}</div>
+        <div class="text-muted small">Chamados Concluídos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:#0078d7;">
+          R$ {{ total_geral.mao_obra | brl }}
+        </div>
+        <div class="text-muted small">Mão de Obra</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold" style="color:#6f42c1;">
+          R$ {{ total_geral.pecas | brl }}
+        </div>
+        <div class="text-muted small">Peças / Materiais</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-success">
+          R$ {{ total_geral.total | brl }}
+        </div>
+        <div class="text-muted small">Total Geral</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cabeçalho da tabela com botão fechar -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h6 class="mb-0 fw-semibold text-muted">
+    Competência: <span class="text-dark">{{ meses[mes] }} / {{ ano }}</span>
+  </h6>
+  {% if not periodo_fechado and total_geral.chamados > 0 %}
+  <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalFechar">
+    <i class="bi bi-lock me-1"></i>Fechar Período
+  </button>
+  {% endif %}
+</div>
+
+<!-- Tabela por Unidade -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Unidade / Filial</th>
+            <th class="text-center">Chamados</th>
+            <th class="text-end">Mão de Obra</th>
+            <th class="text-end">Peças / Mat.</th>
+            <th class="text-end pe-3">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if resultado %}
+            {% for linha in resultado %}
+            <tr>
+              <td class="ps-3">
+                {% if linha.filial %}
+                  <div class="fw-semibold">{{ linha.filial.nome }}</div>
+                  {% if linha.filial.codigo %}
+                    <small class="text-muted">Cód: {{ linha.filial.codigo }}</small>
+                  {% endif %}
+                  {% if linha.filial.cidade %}
+                    <small class="text-muted ms-2">
+                      <i class="bi bi-geo-alt"></i> {{ linha.filial.cidade }}
+                      {% if linha.filial.estado %} / {{ linha.filial.estado }}{% endif %}
+                    </small>
+                  {% endif %}
+                {% else %}
+                  <div class="fw-semibold text-muted fst-italic">Sem unidade vinculada</div>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <span class="badge bg-secondary rounded-pill">{{ linha.chamados }}</span>
+              </td>
+              <td class="text-end">
+                {% if linha.mao_obra > 0 %}R$ {{ linha.mao_obra | brl }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if linha.pecas > 0 %}R$ {{ linha.pecas | brl }}
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end pe-3 fw-semibold
+                {% if linha.total > 0 %}text-success{% else %}text-muted{% endif %}">
+                R$ {{ linha.total | brl }}
+              </td>
+            </tr>
+            {% endfor %}
+
+            <tr class="table-light fw-bold border-top border-2">
+              <td class="ps-3">TOTAL GERAL</td>
+              <td class="text-center">{{ total_geral.chamados }}</td>
+              <td class="text-end">R$ {{ total_geral.mao_obra | brl }}</td>
+              <td class="text-end">R$ {{ total_geral.pecas | brl }}</td>
+              <td class="text-end pe-3 text-success">R$ {{ total_geral.total | brl }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-5">
+                <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                Nenhum chamado concluído com orçamento aprovado em {{ meses[mes] }} / {{ ano }}.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="mt-3 d-flex justify-content-between align-items-center">
+  <small class="text-muted">
+    <i class="bi bi-info-circle me-1"></i>
+    Valores baseados em chamados <strong>Concluídos</strong> com orçamentos <strong>Aprovados</strong>.
+  </small>
+  {% if periodo_fechado %}
+  <small class="text-success">
+    <i class="bi bi-lock-fill me-1"></i>Período registrado no histórico
+  </small>
+  {% endif %}
+</div>
+
+<!-- Histórico importado para este período (origem: importacao) -->
+{% if historico %}
+<div class="mt-5">
+  <h6 class="fw-semibold mb-3">
+    <i class="bi bi-archive me-2 text-warning"></i>
+    Dados Importados de Planilha — {{ meses[mes] }}/{{ ano }}
+  </h6>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Unidade</th>
+              <th class="text-center">Chamados</th>
+              <th class="text-end">Mão de Obra</th>
+              <th class="text-end">Peças</th>
+              <th class="text-end">Total</th>
+              <th class="text-center">Origem</th>
+              <th class="text-center pe-3">Fechado em</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in historico %}
+            <tr>
+              <td class="ps-3 fw-semibold">{{ h.filial_nome }}</td>
+              <td class="text-center"><span class="badge bg-secondary rounded-pill">{{ h.chamados_count }}</span></td>
+              <td class="text-end">R$ {{ h.valor_mao_obra | brl }}</td>
+              <td class="text-end">R$ {{ h.valor_pecas | brl }}</td>
+              <td class="text-end fw-semibold text-success">R$ {{ h.valor_total | brl }}</td>
+              <td class="text-center">
+                {% if h.origem == 'importacao' %}
+                  <span class="badge bg-warning text-dark">
+                    <i class="bi bi-file-earmark-excel me-1"></i>Importado
+                  </span>
+                {% else %}
+                  <span class="badge bg-success">
+                    <i class="bi bi-lock me-1"></i>Sistema
+                  </span>
+                {% endif %}
+              </td>
+              <td class="text-center pe-3 text-muted small">
+                {{ h.fechado_em.strftime('%d/%m/%Y %H:%M') if h.fechado_em else '—' }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal: Fechar Período -->
+<div class="modal fade" id="modalFechar" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="/admin/faturamento/fechar">
+      <input type="hidden" name="mes" value="{{ mes }}">
+      <input type="hidden" name="ano" value="{{ ano }}">
+      <div class="modal-content">
+        <div class="modal-header border-0">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-lock me-2 text-success"></i>Fechar Período
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3">
+            Registrar o faturamento de <strong>{{ meses[mes] }}/{{ ano }}</strong>
+            no histórico permanente do sistema:
+          </p>
+          <ul class="list-unstyled mb-3">
+            <li><i class="bi bi-check-circle text-success me-2"></i>
+              <strong>{{ total_geral.chamados }}</strong> chamados concluídos</li>
+            <li><i class="bi bi-check-circle text-success me-2"></i>
+              Total: <strong>R$ {{ total_geral.total | brl }}</strong></li>
+          </ul>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Observações (opcional)</label>
+            <textarea name="observacoes" class="form-control form-control-sm" rows="2"
+                      placeholder="Ex: Referente ao contrato nº 123, competência março/2026..."></textarea>
+          </div>
+          <div class="alert alert-warning py-2 mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Esta ação pode ser desfeita clicando em "Reabrir" depois.
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success btn-sm">
+            <i class="bi bi-lock me-1"></i>Confirmar Fechamento
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Estilos de impressão -->
+<style>
+@media print {
+  #sidebar, .btn, form, .modal, .alert { display: none !important; }
+  .card { border: 1px solid #dee2e6 !important; box-shadow: none !important; }
+  body { font-size: 12px; }
+}
+</style>
+{% endblock %}

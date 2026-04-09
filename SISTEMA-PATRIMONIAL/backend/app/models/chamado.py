@@ -5,6 +5,11 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
+class TipoChamado(str, enum.Enum):
+    preventiva = "preventiva"
+    corretiva  = "corretiva"
+
+
 class PrioridadeChamado(str, enum.Enum):
     baixa = "baixa"
     media = "media"
@@ -65,6 +70,13 @@ class Chamado(Base):
     status = Column(Enum(StatusChamado), default=StatusChamado.aberto, nullable=False, index=True)
     prioridade = Column(Enum(PrioridadeChamado), default=PrioridadeChamado.media, nullable=False)
 
+    # Campos SLA / planilha de chamados
+    numero_chamado        = Column(Integer, nullable=True, index=True)  # seq. visível
+    tipo_chamado          = Column(Enum(TipoChamado), nullable=True)    # preventiva | corretiva
+    data_chegada_tecnico  = Column(DateTime, nullable=True)             # chegada on-site
+    justificativa_atraso  = Column(Text, nullable=True)                 # quando SLA violado
+    codigo_unidade        = Column(String(10), nullable=True)           # ex: "3.08"
+
     # Datas de controle
     data_abertura = Column(DateTime, default=datetime.utcnow, nullable=False)
     data_inicio_atendimento = Column(DateTime, nullable=True)
@@ -81,6 +93,7 @@ class Chamado(Base):
     filial = relationship("Filial")
     anexos = relationship("AnexoChamado", back_populates="chamado", cascade="all, delete-orphan")
     orcamentos = relationship("Orcamento", back_populates="chamado")
+    glosas = relationship("GlosaChamado", back_populates="chamado", foreign_keys="GlosaChamado.chamado_id")
 
 
 class TipoAnexo(str, enum.Enum):

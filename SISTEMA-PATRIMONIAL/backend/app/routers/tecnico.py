@@ -10,7 +10,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models.chamado import Chamado, PrioridadeChamado, StatusChamado
+from typing import Optional
+from app.models.chamado import Chamado, PrioridadeChamado, StatusChamado, TipoChamado
 from app.models.funcionario import Funcionario
 from app.models.patrimonio import Patrimonio
 from app.models.usuario import PerfilUsuario, Usuario
@@ -131,47 +132,6 @@ def painel_tecnico(
     )
 
 
-# ── Novo chamado — formulário ─────────────────────────────────────────────────
-
-@router.get("/chamado/novo", response_class=HTMLResponse)
-def form_novo_chamado(
-    request: Request,
-    db: Session = Depends(get_db),
-    usuario: Usuario = Depends(_exigir_operador),
-    tenant: Tenant = Depends(get_tenant_atual),
-):
-    if usuario.perfil == PerfilUsuario.superadmin:
-        return RedirectResponse(url="/superadmin", status_code=302)
-
-    patrimonios = (
-        db.query(Patrimonio)
-        .filter(Patrimonio.tenant_id == tenant.id)
-        .order_by(Patrimonio.codigo)
-        .all()
-    )
-    funcionarios = (
-        db.query(Funcionario)
-        .filter(Funcionario.tenant_id == tenant.id, Funcionario.ativo == True)
-        .order_by(Funcionario.nome)
-        .all()
-    )
-    funcionario_logado = _get_funcionario(usuario, tenant, db)
-
-    return templates.TemplateResponse(
-        "tecnico/novo_chamado.html",
-        {
-            "request": request,
-            "usuario": usuario,
-            "tenant": tenant,
-            "patrimonios": patrimonios,
-            "funcionarios": funcionarios,
-            "funcionario_logado": funcionario_logado,
-            "PrioridadeChamado": PrioridadeChamado,
-            "erro": None,
-        },
-    )
-
-
 @router.post("/chamado/novo", response_class=HTMLResponse)
 def criar_chamado(
     request: Request,
@@ -181,6 +141,10 @@ def criar_chamado(
     prioridade: str = Form(...),
     solicitante_id: int = Form(...),
     tecnico_id: int = Form(default=0),
+    tipo_chamado: Optional[str] = Form(None),
+    numero_chamado: Optional[int] = Form(None),
+    data_chegada_tecnico: Optional[str] = Form(None),
+    justificativa_atraso: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(_exigir_operador),
     tenant: Tenant = Depends(get_tenant_atual),
@@ -193,6 +157,20 @@ def criar_chamado(
     except ValueError:
         prioridade_enum = PrioridadeChamado.media
 
+    tipo_enum = None
+    if tipo_chamado:
+        try:
+            tipo_enum = TipoChamado(tipo_chamado)
+        except ValueError:
+            pass
+
+    chegada_dt = None
+    if data_chegada_tecnico:
+        try:
+            chegada_dt = datetime.fromisoformat(data_chegada_tecnico)
+        except ValueError:
+            pass
+
     chamado = Chamado(
         tenant_id=tenant.id,
         patrimonio_id=patrimonio_id,
@@ -203,6 +181,10 @@ def criar_chamado(
         prioridade=prioridade_enum,
         status=StatusChamado.aberto,
         data_abertura=datetime.utcnow(),
+        tipo_chamado=tipo_enum,
+        numero_chamado=numero_chamado,
+        data_chegada_tecnico=chegada_dt,
+        justificativa_atraso=(justificativa_atraso or "").strip() or None,
     )
     db.add(chamado)
     db.commit()

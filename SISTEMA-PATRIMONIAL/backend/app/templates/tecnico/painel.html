@@ -338,6 +338,32 @@
             </div>
           </div>
 
+          <!-- Campos SLA -->
+          <div class="row g-3 mt-1">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Tipo de Chamado</label>
+              <select name="tipo_chamado" class="form-select">
+                <option value="">— Não informado —</option>
+                <option value="preventiva">Preventiva</option>
+                <option value="corretiva">Corretiva</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Nº do Chamado</label>
+              <input type="number" name="numero_chamado" class="form-control"
+                     placeholder="Ex: 296">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Chegada do Técnico</label>
+              <input type="datetime-local" name="data_chegada_tecnico" class="form-control">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label fw-semibold">Justificativa de Atraso</label>
+            <textarea name="justificativa_atraso" class="form-control" rows="2"
+                      placeholder="Preencher se SLA de chegada foi violado..."></textarea>
+          </div>
+
           {% endif %}
 
         </div><!-- /modal-body -->

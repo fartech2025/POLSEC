@@ -15,7 +15,7 @@ from app.middleware.security import SecurityHeadersMiddleware
 from app.middleware.tenant import TenantMiddleware
 from app.routers import auth, patrimonio, movimentacao, dashboard, assistente, da
 from app.routers import tenant, superadmin, tecnico, admin
-from app.routers import cargo, filial, funcionario, chamado, peca, orcamento
+from app.routers import cargo, filial, funcionario, chamado, peca, orcamento, glosa, diesel
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,8 @@ app.include_router(da.router, prefix="/da", tags=["Data Analytics"])
 app.include_router(superadmin.router, prefix="/superadmin", tags=["SuperAdmin"])
 app.include_router(tecnico.router, prefix="/tecnico", tags=["Técnico"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(glosa.router, prefix="/admin/glosa", tags=["Glosa"])
+app.include_router(diesel.router, prefix="/admin/diesel", tags=["Diesel"])
 
 # ── Módulos FARTECH ───────────────────────────────────────────────────────────
 app.include_router(cargo.router, prefix="/cargos", tags=["Cargos"])
@@ -117,6 +119,12 @@ app.include_router(funcionario.router, prefix="/funcionarios", tags=["Funcionár
 app.include_router(chamado.router, prefix="/chamados", tags=["Chamados"])
 app.include_router(peca.router, prefix="/pecas", tags=["Peças & Estoque"])
 app.include_router(orcamento.router, prefix="/orcamentos", tags=["Orçamentos"])
+
+
+@app.get("/health", include_in_schema=False)
+def health_check():
+    """Endpoint de health check — usado pelo Docker e load balancers."""
+    return {"status": "ok", "version": settings.APP_VERSION}
 
 
 @app.get("/")

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Nova Glosa{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0 fw-bold">
+    <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>
+    {% if modo == 'novo' %}Registrar Nova Glosa{% else %}Editar Glosa{% endif %}
+  </h4>
+  <a href="/admin/glosa" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <form method="post" action="/admin/glosa/novo">
+          <!-- Unidade -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Unidade <span class="text-danger">*</span></label>
+            <select name="filial_id" class="form-select" required
+                    onchange="document.getElementById('filial_nome').value = this.options[this.selectedIndex].text">
+              <option value="">Selecione a unidade…</option>
+              {% for f in filiais %}
+              <option value="{{ f.id }}"
+                {% if chamado_pre and chamado_pre.filial_id == f.id %}selected{% endif %}>
+                {{ f.nome }}
+              </option>
+              {% endfor %}
+            </select>
+            <!-- campo hidden que envia o nome snapshot -->
+            <input type="hidden" name="filial_nome" id="filial_nome"
+                   value="{% if chamado_pre and chamado_pre.filial %}{{ chamado_pre.filial.nome }}{% endif %}">
+          </div>
+
+          <!-- Chamado vinculado (opcional) -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Chamado vinculado <span class="text-muted small">(opcional)</span></label>
+            <input type="number" name="chamado_id" class="form-control"
+                   placeholder="Nº do chamado"
+                   value="{{ chamado_pre.id if chamado_pre else '' }}">
+            <div class="form-text">Deixe em branco para glosa manual sem chamado associado.</div>
+          </div>
+
+          <!-- Motivo -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Motivo da indisponibilidade <span class="text-danger">*</span></label>
+            <input type="text" name="motivo" class="form-control" required
+                   placeholder="Ex: Sinal de telefonia não bloqueado no interior da unidade"
+                   value="{{ chamado_pre.titulo if chamado_pre else '' }}">
+          </div>
+
+          <!-- Datas -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Data/Hora de Início <span class="text-danger">*</span></label>
+              <input type="datetime-local" name="data_inicio" class="form-control" required
+                     value="{{ chamado_pre.data_abertura.strftime('%Y-%m-%dT%H:%M') if chamado_pre else '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                Valor Base do Contrato <span class="text-muted small">(opcional)</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text">R$</span>
+                <input type="number" name="valor_base" class="form-control" step="0.01" min="0"
+                       placeholder="0,00">
+              </div>
+              <div class="form-text">Valor mensal do contrato da unidade. Necessário para calcular o valor da penalidade.</div>
+            </div>
+          </div>
+
+          <!-- Observações -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Observações</label>
+            <textarea name="observacoes" class="form-control" rows="3"
+                      placeholder="Informações adicionais sobre a ocorrência…"></textarea>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-warning">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>Registrar Glosa
+            </button>
+            <a href="/admin/glosa" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Quadro de faixas de referência -->
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-header bg-transparent fw-semibold small py-2">
+        <i class="bi bi-table me-1"></i>Quadro de Penalidades
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0 text-center">
+          <thead class="table-light">
+            <tr>
+              <th>Horas de Indisponibilidade</th>
+              <th>Percentual de Glosa</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1 até 24h</td><td class="text-warning fw-semibold">2%</td></tr>
+            <tr><td>24 até 60h</td><td class="text-orange fw-semibold" style="color:#fd7e14">4%</td></tr>
+            <tr><td>60 até 168h</td><td class="fw-semibold" style="color:#e55353">8%</td></tr>
+            <tr><td>168 até 240h</td><td class="text-danger fw-semibold">16%</td></tr>
+            <tr><td>Acima de 240h</td><td class="fw-bold text-danger">32%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Garante que filial_nome seja preenchido ao selecionar a unidade
+document.querySelector('select[name="filial_id"]').addEventListener('change', function() {
+  document.getElementById('filial_nome').value = this.options[this.selectedIndex].text;
+});
+</script>
+{% endblock %}
